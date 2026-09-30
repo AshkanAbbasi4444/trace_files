@@ -1,0 +1,1848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C memory viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#14213D;--muted:#5B6B82;--faint:#94A3B8;--line:#D5DEE8;--border:#A9B6C6;--panel:#F1F5F9;--paper:#F8FAFC;--grid:#E7EDF4;--bg:#fff;
+  --amb:#FEF3C7;--ambInk:#B45309;--reach:#1D4ED8;--bad:#B91C1C;--good:#15803D;--dead:#94A3B8;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;--sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ink:#14213D;--muted:#5B6B82;--line:#D5DEE8;--panel:#F1F5F9;--bg:#fff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans)}
+.bar{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:6px 12px;z-index:3}
+.br{display:flex;gap:10px;align-items:center;flex-wrap:wrap;min-height:34px}
+.br2{gap:6px;margin-top:5px;padding-top:6px;border-top:1px solid #EEF1F4}
+.grp{display:inline-flex;gap:4px}
+.gl{font-size:12px;color:var(--faint);margin:0 2px 0 8px}
+.gl:first-child{margin-left:0}
+button,select{font:inherit;font-size:13px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:4px 11px;cursor:pointer}
+button:hover,select:hover{border-color:var(--border);background:#F8FAFC}
+button.amber{background:var(--amb);color:var(--ambInk);border-color:#F2C46D;font-weight:600}
+button.amber:hover{background:#FDE9B0}
+.brand{display:inline-flex;align-items:center;gap:7px;font:600 13.5px var(--sans);color:var(--ink);margin-right:4px}
+.brand svg{color:var(--ink)}
+input[type=range]{flex:1;min-width:90px;accent-color:var(--ink)}
+.pos{font:12.5px var(--mono);color:var(--muted);white-space:nowrap}
+@media (max-width:1560px){.brand .bt{display:none}}
+@media (max-width:1300px){.pos span:last-child{display:none}}
+.pos b{color:var(--ink);font-weight:700}
+.pos span{margin-left:12px}
+.chip{position:relative;display:inline-flex}
+.chip input{position:absolute;opacity:0;width:1px;height:1px}
+.chip span{font-size:12.5px;padding:3px 11px;border:1px solid var(--line);border-radius:999px;color:var(--muted);background:#fff;cursor:pointer;user-select:none}
+.chip span:hover{border-color:var(--border)}
+.chip input:checked+span{background:#EEF2F7;border-color:var(--ink);color:var(--ink)}
+.chip input:checked+span::before{content:"✓ ";font-weight:700}
+button:focus-visible,select:focus-visible,input[type=range]:focus-visible,.chip input:focus-visible+span{outline:2px solid var(--reach);outline-offset:2px}
+kbd{font:11px var(--mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;margin-right:3px;background:#fff;color:var(--ink)}
+.ol{font-size:12px;color:var(--faint);margin:10px 12px 3px}
+#console{height:auto;max-height:110px;border:1px solid var(--line);margin:0 10px;border-radius:8px;background:#fff;padding:6px 10px}
+.drop{margin:24px auto;max-width:640px;border:2px dashed var(--line);border-radius:12px;padding:28px;text-align:center;color:var(--muted)}
+.drop b{color:var(--ink)}
+.main{display:grid;grid-template-columns:calc(320px * var(--cz,1)) minmax(0,1fr);gap:0}
+@media(max-width:800px){.main{grid-template-columns:1fr}}
+pre{margin:0;height:calc(100vh - var(--barh,52px));overflow:auto;background:#FBFCFE;border-right:1px solid var(--line);padding:8px 8px 8px 4px;font:11.5px/1.55 var(--mono)}
+.cl{display:flex;white-space:pre;border-radius:2px}
+.cl .ln{color:var(--faint);width:calc(28px * var(--cz,1));text-align:right;margin-right:10px;flex:0 0 auto;user-select:none}
+.cl.nx{background:#EEF2F7;box-shadow:inset 3px 0 0 #7C8BA1}
+.cl.hi{background:var(--amb);color:var(--ambInk);font-weight:700;box-shadow:inset 3px 0 0 var(--ambInk)}
+.cl.hi::after,.cl.nx::after{font-size:10px;font-weight:400;color:var(--muted);margin-left:10px}
+.cl.hi::after{content:"← ran"}
+.cl.nx::after{content:"← next"}
+#pic{overflow:auto;padding:14px;background:#fff;border-bottom:1px solid var(--line)}
+#pic svg{display:block;width:100%;min-width:760px;height:auto}
+.hint{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:12px;color:var(--muted);padding:8px 12px 14px}
+@keyframes pop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.pop{animation:pop .4s both;transform-box:fill-box}
+@keyframes draw{to{stroke-dashoffset:0}}
+.draw{stroke-dasharray:1;stroke-dashoffset:1;animation:draw .6s ease-out forwards}
+.seg{display:inline-flex}
+.seg button{border-radius:0;margin-left:-1px}
+.seg button:first-child{border-radius:7px 0 0 7px;margin-left:0}
+.seg button:last-child{border-radius:0 7px 7px 0}
+.seg button.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:600;position:relative}
+/* memory layout view */
+.mem{--ac:80px;--nc:130px;--vc:104px;position:relative;font:11.5px/1.3 var(--mono);color:var(--ink);padding-bottom:12px}
+.mem.real{--ac:112px;--vc:176px}
+.cols{display:flex;gap:48px;align-items:flex-start;padding-right:44px;width:max-content}
+.stk,.hp{flex:0 0 auto}
+.mem h2{font:700 13.5px/1.4 var(--sans);margin:14px 0 6px}
+.mem h2 span{font-weight:400;color:var(--muted);margin-left:6px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font:12px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend .c{width:24px;margin:0;font:11px/20px var(--mono)}
+.legend .c b{animation:none}
+.fr{margin:0 0 12px;border-left:4px solid var(--fc,#334155);background:var(--ft,#F4F6F9);border-radius:0 10px 10px 0;padding:6px 8px 8px 6px;border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.fh{font:600 12.5px var(--sans);color:var(--fc,#334155);margin:0 0 2px}
+.fh em{font-style:normal;font-weight:400;color:var(--muted);margin-left:6px}
+.r{display:grid;grid-template-columns:var(--ac) var(--nc) repeat(8,24px) var(--vc);align-items:center}
+.r>.a{color:var(--muted);text-align:right;padding-right:10px}
+.r>.nm{padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nm small{color:var(--muted);font-size:10px;margin-left:5px}
+.r>.vl{padding-left:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r.off .c{border:0;height:16px;line-height:16px;font-size:10px;color:var(--muted);background:none}
+.c{position:relative;display:block;height:22px;line-height:20px;text-align:center;border:1px solid #D2DBE6;margin:0 -1px -1px 0;font-style:normal;background:#fff}
+.c b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:inherit;animation:.22s both;animation-delay:calc(var(--k,0) * var(--d,60ms))}
+.c .o{animation-name:bout}
+.c .n{animation-name:bin}
+@keyframes bout{to{opacity:0}}
+@keyframes bin{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:none}}
+.c.chg .n{background:var(--amb);color:var(--ambInk);font-weight:700;box-shadow:inset 0 0 0 1px var(--ambInk)}
+.c.pad,.c.gap{background:repeating-linear-gradient(135deg,#fff 0 3px,#E6EAEE 3px 4.5px);color:var(--faint)}
+.c.hdr{background:var(--panel);color:#A0A7AE}
+.c.alloc{background:#E8EBEE;color:var(--muted);border-style:dashed;border-color:var(--dead)}
+.c.stale,.c.junk{color:#A0A7AE}
+.c.sys{background:#F7F8F9;color:#9AA1A8}
+.c.none{border-style:dotted}
+.c.lib::after{content:"";position:absolute;left:3px;right:3px;bottom:2px;height:2px;border-radius:1px;background:var(--ink)}
+.r.hdr>.a,.r.hdr>.nm,.r.hdr>.vl{color:#A0A7AE}
+.gapr{color:var(--muted);font-size:10.5px;padding:3px 0 4px calc(var(--ac) + 8px)}
+.heap{display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.card{--ac:50px;--nc:96px;--vc:128px;border:1px solid var(--border);border-radius:10px;padding:8px 10px 10px;background:#fff;box-shadow:4px 4px 0 #DCE4EE}
+.card .ct{margin:-8px -10px 6px;padding:7px 10px 6px;background:#EEF2F7;border-radius:10px 10px 0 0;border-bottom:1px solid var(--line)}
+.card.freed,.card.lost,.card.foreign{box-shadow:none}
+.card.freed .ct{background:#EDF1F5}
+.card.lost .ct{background:#FBE9E9}
+.mem.real .card{--ac:110px;--vc:180px}
+#pic svg.arrows{position:absolute;left:0;top:0;min-width:0;pointer-events:none;overflow:visible}
+.card.freed{background:var(--panel);border:1.3px dashed var(--dead)}
+.card.freed .nm,.card.freed .vl,.card.freed .ct b{color:var(--muted)}
+.card.lost{border:1.3px dashed var(--bad);background:#FDF6F5}
+.ct{display:flex;gap:10px;align-items:baseline;margin:0 0 4px}
+.ct b{font-size:12.5px}
+.ct span{color:var(--muted);font:11px system-ui,-apple-system,"Segoe UI",sans-serif}
+.ct em{font:700 11px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--muted);margin-left:auto}
+.card.lost .ct em{color:var(--bad)}
+.r.hot>.nm,.r.hot>.vl{color:var(--ambInk);font-weight:700}
+.vl .bad{color:var(--bad);font-weight:700}
+.vl .junk{color:var(--muted)}
+.ct .rx{color:#1F5FA0;font:700 11px var(--mono)}
+.card.foreign{background:var(--panel);border-color:#D9DDE1;align-self:stretch;padding:6px 10px}
+.card.foreign.top{background:#fff;border-style:dashed}
+.card.foreign .ct{margin:0}
+.card.foreign .ct b,.card.foreign .ct span{color:var(--muted)}
+.ladder{position:relative;border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:0 0 10px;background:#fff;font:12px/1.55 var(--mono);color:var(--ink);max-width:820px}
+.ladder .lt{font:12.5px system-ui,-apple-system,"Segoe UI",sans-serif;margin-bottom:4px}
+.ladder .lt span{color:var(--muted);margin-left:6px}
+.ladder table{border-collapse:collapse}
+.ladder td{padding:1px 16px 1px 0;white-space:nowrap}
+.ladder td.e{color:#1F5FA0;font-weight:700}
+.ladder td.t{color:var(--muted)}
+.ladder .lh{font:11.5px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--muted);margin-top:4px}
+.ladder .lx{position:absolute;right:10px;top:2px;cursor:pointer;color:var(--muted);font:18px system-ui,sans-serif}
+#pic [data-lad]{cursor:pointer}
+.fh .sig{display:block;font-weight:400;color:var(--muted);font-size:10.5px}
+.hopin{animation:hopin .35s both}
+@keyframes hopin{from{opacity:0}to{opacity:1}}
+@keyframes hopline{from{outline-color:transparent}to{outline-color:#1F5FA0}}
+.r.hopbox,.card.hopbox{outline:2.5px solid #1F5FA0;outline-offset:1px;position:relative;animation:hopline .35s both;animation-delay:var(--hd,0ms)}
+.r.hopbox::after,.card.hopbox::after{content:attr(data-hop);position:absolute;left:-12px;top:-9px;background:#1F5FA0;color:#fff;border-radius:9px;font:700 11px/16px system-ui,sans-serif;padding:0 5px;animation:hopin .35s both;animation-delay:var(--hd,0ms)}
+svg.arrows path.hoparrow{stroke:#1F5FA0;stroke-width:3.4;animation:hopin .35s both}
+.ex{border-bottom:1px dotted #1F5FA0;cursor:help}
+.ex:hover{background:#E6F1FB}
+#pic [data-ex]{cursor:help}
+.fh .ret{display:block;color:#854F0B;font-weight:700;font-size:11px}
+.fh .ret.bad{color:var(--bad)}
+.ct .nr{color:var(--muted);font:italic 10.5px system-ui,sans-serif}
+#code{font-size:calc(11.5px * var(--cz,1))}
+.zl{font-size:13px;color:var(--muted)}
+.zl select{padding:2px 4px}
+.zw{transform-origin:0 0;width:max-content}
+.lists{font:12px/1.6 var(--mono);color:var(--ink);margin:-2px 0 8px}
+.lists b{font-weight:700}
+.lists span{color:var(--muted)}
+.lists .bad{color:var(--bad)}
+.leak .lb{font:12.5px system-ui,-apple-system,"Segoe UI",sans-serif;margin:6px 0 2px;font-weight:600}
+.leak .lb.bad{color:var(--bad)}
+.leak .lb.good{color:var(--good)}
+.watch{margin:10px 10px 0;border:1px solid var(--line);border-radius:10px;background:#fff}
+.wh{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 10px}
+.wh b{font:600 13px var(--sans);margin-right:2px}
+.wh input{font:12.5px var(--mono);border:1px solid var(--line);border-radius:8px;padding:4px 9px;min-width:200px;color:var(--ink)}
+.wh input:focus-visible{outline:2px solid var(--reach);outline-offset:1px}
+.wn{font-size:12px;color:var(--muted)}
+#wlist:not(:empty){border-top:1px solid var(--line)}
+.wr{display:grid;grid-template-columns:minmax(230px,auto) minmax(120px,1fr) auto auto;gap:3px 14px;align-items:center;padding:7px 10px;border-bottom:1px solid #EEF2F7}
+.wr:last-child{border-bottom:0}
+.wt{display:inline-flex;gap:7px;align-items:baseline}
+.wk{font:700 10px/15px var(--sans);background:var(--ink);color:#fff;border-radius:8px;padding:0 6px}
+.wt code{font:600 13px var(--mono);color:var(--ink)}
+.wf{font-size:12px}
+.wv{font:700 14px var(--mono);color:var(--ink);justify-self:start;padding:0 6px;border-radius:6px}
+.wv.now{color:var(--ambInk);background:var(--amb)}
+.wv.off{color:var(--faint);font:500 12.5px var(--sans)}
+.wv.bad{color:var(--bad);font:500 12.5px var(--sans)}
+.wc{font-size:12px;color:var(--muted)}
+.wb{display:inline-flex;gap:4px}
+.wb button{padding:2px 8px;font-size:12px}
+.wtl{grid-column:1/-1;width:100%;height:18px;cursor:pointer;display:block}
+.wr details{grid-column:1/-1;font-size:12px}
+.wr summary{cursor:pointer;color:var(--muted);width:max-content}
+.wr table{border-collapse:collapse;margin:4px 0 2px}
+.wr td{padding:1px 14px 1px 0;font:12px var(--mono);color:var(--muted)}
+.wr td b{color:var(--ink)}
+.wr tr{cursor:pointer}
+.wr tr:hover td,.wr tr.on td{color:var(--reach)}
+.wlib{font:600 10.5px var(--sans);color:var(--ink);background:#EEF2F7;border-radius:6px;padding:0 5px;margin-left:6px}
+.r.watched,.card.watched{position:relative;box-shadow:inset 3px 0 0 var(--ink)}
+.r.watched::before,.card.watched::before{content:attr(data-w);position:absolute;right:-8px;top:-8px;background:var(--ink);color:#fff;font:700 10px/15px var(--sans);padding:0 6px;border-radius:8px;z-index:2}
+.ladder .lw{float:right;margin:-2px 10px 0 0;font-size:12px;padding:2px 9px}
+button.icon{width:30px;padding:4px 0;font-weight:700;border-radius:50%}
+.mw{position:relative}
+.menu{position:absolute;right:0;top:calc(100% + 6px);width:270px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(20,33,61,.14);padding:6px 10px 10px;z-index:20}
+.mg{font:600 11.5px var(--sans);color:var(--faint);margin:8px 4px 2px}
+.mi{display:flex;gap:9px;align-items:center;padding:4px 6px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--ink)}
+.mi:hover{background:#F1F5F9}
+.mi input{accent-color:var(--ink);margin:0}
+.mi small{margin-left:auto;color:var(--faint);font-size:11.5px}
+.mz{display:flex;justify-content:space-between;align-items:center;padding:3px 6px;font-size:13px;color:var(--ink)}
+.mr{width:100%;margin-top:10px;font-size:12.5px}
+.cl{cursor:pointer}
+.fr.sp{padding-left:66px;position:relative}
+.r{position:relative}
+.spm{position:absolute;left:-62px;top:2px;font:700 10px/16px var(--sans);color:#fff;background:var(--ink);border-radius:8px;padding:0 6px;white-space:nowrap}
+.spm.rz{background:#fff;color:var(--muted);border:1px dashed var(--faint);line-height:14px;font-weight:600}
+.r.rz{background:linear-gradient(90deg,#CBD5E1 0 3px,transparent 3px)}
+.help{position:fixed;inset:0;background:rgba(248,250,252,.82);z-index:40;display:flex;align-items:flex-start;justify-content:center;padding:56px 16px;overflow:auto}
+.help[hidden]{display:none}
+.hb{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 50px rgba(20,33,61,.16);max-width:860px;width:100%;padding:18px 22px 20px;position:relative}
+.hb h2{font:600 17px var(--sans);margin:0 0 2px}
+.hb .hs{color:var(--muted);font-size:13px;margin:0 0 12px}
+.hb h3{font:600 12.5px var(--sans);color:var(--faint);margin:14px 0 6px}
+.hgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:2px 26px}
+.hrow{display:grid;grid-template-columns:62px 1fr;gap:10px;align-items:center;font-size:13px;padding:3px 0}
+.hrow>:first-child{justify-self:start}
+.hx{position:absolute;right:14px;top:12px;border-radius:50%;width:30px;padding:4px 0}
+.sw{display:inline-block;width:46px;height:22px;border-radius:6px;border:1px solid var(--border);background:#fff;font:600 11px/20px var(--mono);text-align:center;color:var(--ink)}
+.sw.amb{background:var(--amb);border:2px solid var(--ambInk);color:var(--ambInk)}
+.sw.dark{border:2px solid var(--ink)}
+.sw.fade{opacity:.3}
+.sw.freed{background:var(--panel);border:1.5px dashed var(--dead)}
+.sw.lost{background:#FEF6F6;border:1.5px dashed var(--bad)}
+.sw.sys{background:#EBEEF1;border:0}
+.sw.bytes{width:24px;height:22px}
+.sw.hatch{background:repeating-linear-gradient(135deg,#fff 0 3px,#E6EAEE 3px 4.5px)}
+.sw.hdr{background:#EEF1F4;color:var(--faint)}
+.sw.alloc{border:1px dashed var(--faint);color:var(--faint)}
+.sw.lib{box-shadow:inset 0 -3px 0 #fff,inset 0 -5px 0 var(--ink)}
+.sw.line{width:54px;border:0;border-radius:3px;background:var(--amb);box-shadow:inset 3px 0 0 var(--ambInk)}
+.sw.line.nx{background:#EEF2F7;box-shadow:inset 3px 0 0 #7C8BA1}
+.sw.txt{border:0;width:auto;background:none;font-weight:700}
+.hovrow{outline:2px solid var(--reach);outline-offset:1px;border-radius:4px;background-color:rgba(29,78,216,.05)}
+.bugbar{position:relative;background:#FEF2F2;border:1px solid #FCA5A5;border-left:4px solid var(--bad);border-radius:10px;padding:8px 150px 8px 12px;margin:0 0 12px;font-size:13px;color:#7F1D1D}
+.bugbar b{color:var(--bad)}
+.bugbar .bn{position:absolute;right:10px;top:7px;font-size:12px;color:#991B1B;display:inline-flex;gap:4px;align-items:center}
+.bugbar .bn button{padding:1px 8px;font-size:12px}
+.bugpill{background:#FEF2F2;color:var(--bad);border-color:#FCA5A5;font-weight:600;border-radius:999px}
+.bugpill:hover{background:#FEE2E2}
+.cl.bug .ln{color:var(--bad);font-weight:700}
+.cl.bug .ln::before{content:"● ";font-size:8px;vertical-align:2px}
+.words{background:#F8FAFC;border:1px solid var(--line);border-left:4px solid #7C8BA1;border-radius:10px;padding:7px 12px 8px;margin:0 0 12px;font-size:13px;color:var(--ink)}
+.words .wl{font:600 12.5px var(--sans);color:var(--muted);margin-bottom:3px}
+.words .wl code{font:600 12.5px var(--mono);color:var(--ink);margin-left:6px}
+.words ul{margin:0;padding-left:18px}
+.words li{margin:1px 0;line-height:1.5}
+.words li code{font:600 12.5px var(--mono);color:var(--ink);background:#EEF2F7;border-radius:4px;padding:0 4px}
+.note{font:13px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--muted);padding:16px 4px}
+@media (prefers-reduced-motion: reduce){.pop,.c b,.hopin,.hopbox,.hopbox::after,.hoparrow{animation:none!important}.draw{animation:none!important;stroke-dashoffset:0}.c .o{display:none}}
+</style>
+</head>
+<body>
+<div class="bar" id="bar">
+ <div class="br">
+  <span class="brand"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="4.5" y="2.5" width="9" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M1.5 6h3M1.5 9h3M1.5 12h3M13.5 6h3M13.5 9h3M13.5 12h3" stroke="currentColor" stroke-width="1.4"/></svg><span class="bt">C memory viewer</span></span>
+  <span class="seg"><button id="vC" class="on" title="Switch view (V)">node cards</button><button id="vM" title="Switch view (V)">memory layout</button></span>
+  <span class="grp"><button id="openT">Open trace</button><button id="openC">Open .c file</button></span>
+  <span class="grp"><button id="fprev" title="Jump to the previous function">⇤ fn</button><button id="prev" title="Previous step (←)">←</button><button id="next" title="Next step (→)">→</button><button id="fnext" title="Jump to the next function">fn ⇥</button><button id="play" class="amber" title="Play or pause (Space)">▶ Play</button></span>
+  <input type="range" id="slider" min="0" max="0" value="0" aria-label="step">
+  <span class="pos" id="pos"></span>
+  <button id="bugB" class="bugpill" hidden title="jump to the next bug">bugs</button>
+  <button id="helpB" class="icon" title="What every colour and mark means (?)" aria-label="What the marks mean">?</button>
+  <span class="mw"><button id="menuB" aria-haspopup="true" aria-expanded="false">View ▾</button>
+   <div id="menu" class="menu" hidden>
+    <div class="mg">Show</div>
+    <label class="mi"><input type="checkbox" id="simple" checked>simple addresses<small>0x100, 0x7ffd…</small></label>
+    <label class="mi"><input type="checkbox" id="fint" checked>frame internals<small>rsp, rbp, canary</small></label>
+    <label class="mi"><input type="checkbox" id="lorder">list order<small>cards follow next</small></label>
+    <label class="mi"><input type="checkbox" id="fold">hide freed/leaked</label>
+    <label class="mi"><input type="checkbox" id="wordsC" checked>line in words<small>what each line did</small></label>
+    <div class="mg">Stepping</div>
+    <label class="mi"><input type="checkbox" id="hstep">heap steps only</label>
+    <label class="mi"><input type="checkbox" id="wstep">watch steps only</label>
+    <label class="mi"><input type="checkbox" id="bstep">bug steps only</label>
+    <div class="mg">Zoom</div>
+    <label class="mz">picture <select id="pz"><option value="fit">fit</option><option value="75">75%</option><option value="100">100%</option><option value="125">125%</option><option value="150">150%</option><option value="175">175%</option><option value="200">200%</option></select></label>
+    <label class="mz">code <select id="cz"><option value="100">100%</option><option value="125">125%</option><option value="150">150%</option><option value="175">175%</option><option value="200">200%</option></select></label>
+    <button id="reset" class="mr">Reset to defaults</button>
+   </div></span>
+ </div>
+ <input type="file" id="fT" accept=".json" hidden><input type="file" id="fC" accept=".c,.h,.txt" hidden>
+</div>
+<div id="help" class="help" hidden role="dialog" aria-modal="true" aria-label="What the marks mean"><div class="hb">
+ <button class="hx icon" id="helpX" title="Close (Esc)" aria-label="Close">×</button>
+ <h2>What the marks mean</h2><p class="hs">Everything is about the line that just ran: the amber line in the code.</p>
+ <div class="hgrid"><div>
+  <h3>Node cards</h3>
+  <div class="hrow"><span class="sw amb">6</span><span>Changed by the line that just ran</span></div>
+  <div class="hrow"><span class="sw dark">6</span><span>Read by that line, or where a changed pointer now leads</span></div>
+  <div class="hrow"><span class="sw fade">6</span><span>Not touched by that line</span></div>
+  <div class="hrow"><span class="sw txt" style="color:#1D4ED8">= *head</span><span>Blue tag: how the running function gets to this box. Hover it to follow it one hop at a time</span></div>
+  <div class="hrow"><svg width="56" height="22" aria-hidden="true"><circle cx="5" cy="11" r="3.6" fill="#5B6B82"/><path d="M5,11 C22,11 32,11 50,11" stroke="#5B6B82" stroke-width="1.6" fill="none"/><path d="M44,7 L52,11 L44,15 L46,11z" fill="#5B6B82"/></svg><span>A pointer: it starts at the dot and ends at the box whose address it holds</span></div>
+  <div class="hrow"><span class="sw txt" style="color:#1D4ED8">**head</span><span>At an arrow's tip: what you get by following that arrow</span></div>
+  <div class="hrow"><svg width="56" height="22" aria-hidden="true"><path d="M3,11 H50" stroke="#94A3B8" stroke-width="1.8" stroke-dasharray="3 4" fill="none"/></svg><span>Cut: the link this line just replaced</span></div>
+  <div class="hrow"><svg width="56" height="22" aria-hidden="true"><path d="M3,11 H46" stroke="#B91C1C" stroke-width="1.6" stroke-dasharray="5 4" fill="none"/><path d="M44,7 L52,11 L44,15 L46,11z" fill="#B91C1C"/></svg><span>Points to freed memory: using it is a bug</span></div>
+  <div class="hrow"><svg width="56" height="22" aria-hidden="true"><path d="M3,11 H46" stroke="#B45309" stroke-width="1.6" stroke-dasharray="4 3" fill="none"/><path d="M44,7 L52,11 L44,15 L46,11z" fill="#B45309"/></svg><span>At a call: where a parameter's value came from. After a return: where the value goes</span></div>
+  <div class="hrow"><span class="sw lost"></span><span>Leaked: nothing points to it any more</span></div>
+  <div class="hrow"><span class="sw freed"></span><span>Freed: given back with free()</span></div>
+  <div class="hrow"><span class="sw txt" style="font-size:10px">free() wrote…</span><span>Under a card: a library call wrote into this block on this line (a gdb watchpoint caught it)</span></div>
+  <div class="hrow"><span class="sw txt">??</span><span>Not set yet: whatever bytes were left there</span></div>
+  <div class="hrow"><svg width="56" height="22" aria-hidden="true"><rect x="2" y="4" width="8" height="14" rx="2" fill="#BFDBFE"/><rect x="14" y="4" width="8" height="14" rx="2" fill="#93C5FD"/><rect x="26" y="4" width="8" height="14" rx="2" fill="#3B82F6"/><rect x="38" y="4" width="8" height="14" rx="2" fill="#1D4ED8"/></svg><span>Bar on the left of a box: how many hops away it is (own, 1, 2, 3+)</span></div>
+  <div class="hrow"><svg width="56" height="22" aria-hidden="true"><rect x="2" y="2" width="5" height="18" rx="2.5" fill="#334155"/><rect x="16" y="2" width="5" height="18" rx="2.5" fill="#0F766E"/><rect x="30" y="2" width="5" height="18" rx="2.5" fill="#6D28D9"/></svg><span>Each function has its own colour; main is always slate</span></div>
+ </div><div>
+  <h3>Stack frames</h3>
+  <div class="hrow"><span class="sw sys"></span><span>Not your variable: return addr, saved rbp, stack canary, not used</span></div>
+  <div class="hrow"><span class="spm" style="position:static">rsp</span><span>The stack pointer: the lowest address this frame uses</span></div>
+  <div class="hrow"><span class="spm" style="position:static">rbp</span><span>The frame pointer: your locals sit below it</span></div>
+  <div class="hrow"><span class="spm rz" style="position:static">red zone</span><span>Below rsp. A function that calls nothing may keep its locals here</span></div>
+  <h3>Watches</h3>
+  <div class="hrow"><span class="wk" style="justify-self:start">W1</span><span>A box you're watching</span></div>
+  <div class="hrow"><span class="wlib" style="margin:0">inside free()</span><span>In a watch's history: this change happened inside a library call</span></div>
+  <h3>Memory layout</h3>
+  <div class="hrow"><span class="sw bytes amb">0a</span><span>A byte that changed</span></div>
+  <div class="hrow"><span class="sw bytes hatch"></span><span>Padding: bytes no variable uses</span></div>
+  <div class="hrow"><span class="sw bytes hdr">21</span><span>malloc's header, above each block</span></div>
+  <div class="hrow"><span class="sw bytes alloc">59</span><span>The allocator's, after free()</span></div>
+  <div class="hrow"><span class="sw bytes lib">2a</span><span>Written inside a library call like free() or memset(): a real gdb watchpoint caught it</span></div>
+  <div class="hrow"><span class="sw txt">+0…+7</span><span>8 bytes a row, lowest address on the left (little-endian)</span></div>
+  <h3>Code</h3>
+  <div class="hrow"><span class="sw line"></span><span>The line that just ran</span></div>
+  <div class="hrow"><span class="sw line nx"></span><span>The line that runs next</span></div>
+  <div class="hrow"><span class="sw txt" style="border-bottom:1px dotted #1D4ED8;border-radius:0;font-weight:500">head</span><span>Hover to follow it. Click a line to jump to where it runs (Shift: back)</span></div>
+  <h3>Line in words</h3>
+  <div class="hrow"><span class="sw" style="background:#F8FAFC;border:1px solid #D5DEE8;border-left:4px solid #7C8BA1"></span><span>What the line that just ran did, in plain words, with the real values. Turn it off in View</span></div>
+  <h3>Bugs</h3>
+  <div class="hrow"><span class="bugpill" style="padding:1px 8px;border:1px solid #FCA5A5">2 bugs</span><span>How many bugs this run had. Click it to jump to the next one</span></div>
+  <div class="hrow"><span class="sw" style="background:#FEF2F2;border:1px solid #FCA5A5;border-left:4px solid #B91C1C"></span><span>A bug on this step: using freed memory, reading a variable before it's set, freeing twice, or a crash</span></div>
+  <div class="hrow"><span class="sw txt" style="color:#B91C1C">● 67</span><span>A line where a bug happens somewhere in the run</span></div>
+  <h3>Keys</h3>
+  <div class="hrow"><span><kbd>←</kbd><kbd>→</kbd></span><span>Step (<kbd>Space</kbd> plays, <kbd>V</kbd> switches view, <kbd>?</kbd> opens this, <kbd>Esc</kbd> closes)</span></div>
+ </div></div>
+</div></div>
+<div id="drop" class="drop"><b>Drop your trace here</b><br>Make one with <code>gdb -q -nx -batch -x trace.py ./prog</code><br><br>Drop your <b>.c</b> file too, to see each line as it runs.</div>
+<div class="main" id="main" style="display:none">
+  <pre id="code"></pre>
+  <div><div id="watch" class="watch" hidden><div class="wh"><b>Watch</b><select id="wfn" aria-label="in which function"></select><input id="wex" type="text" placeholder="head->next" aria-label="expression to watch" spellcheck="false"><button id="wadd">Add</button><span class="wn" id="wnote"></span></div><div id="wlist"></div></div><div id="pic"></div><div class="ol">Program output</div><pre id="console"></pre><div class="hint"><span><kbd>←</kbd><kbd>→</kbd> step</span><span><kbd>Space</kbd> play</span><span><kbd>V</kbd> switch view</span><span>Click a variable to see its ladder</span><span>Hover an expression to follow it</span><span>Click a code line to jump to it</span><span><kbd>?</kbd> what the marks mean</span></div></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const AMB="#B45309",AMBG="#FEF3C7",INK="#14213D",MUT="#5B6B82",LN="#D5DEE8",PNL="#F1F5F9",BAD="#B91C1C",DEAD="#94A3B8",BORDER="#A9B6C6",FAINT="#94A3B8";
+const MONO=`font-family="'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace"`;
+/* each function gets its own colour: a spine and a faint tint on its frame (main is always slate) */
+const FPAL=[["#334155","#F4F6F9"],["#0F766E","#EFF8F6"],["#6D28D9","#F5F2FD"],["#4D7C0F","#F4F8EC"],["#A21CAF","#FBF1FC"],["#57534E","#F6F5F4"]];   /* none of them blue, amber or red: those already mean something */
+let FCOL={};
+function frameColors(t){ FCOL={}; let k=0;
+  t.steps.forEach(s=>s.frames.forEach(f=>{ if(!(f.func in FCOL)) FCOL[f.func]=f.func==="main"?FPAL[0]:FPAL[1+(k++%(FPAL.length-1))]; })); }
+const fcol=fn=>FCOL[fn]||FPAL[0];
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+let TRACE=null, SRC=null, at=0, timer=null, simple=true, view="cards", MAP={heap:{},size:{},lo:0,hi:0}, PZ="fit", CZ=100;
+let LORDER=false, HEAPONLY=false, FOLD=false, FRAMEINT=true;
+try{ PZ=localStorage.getItem("mv.pz")||"fit"; CZ=+localStorage.getItem("mv.cz")||100; }catch(e){}     /* the zoom you picked last time */
+
+/* ---------- pretty addresses: heap 0x100, 0x200 …, stack 0x7ffd…, both keeping real offsets ---------- */
+function buildMap(t){
+  const order=[], size={}; let lo=Infinity, hi=-Infinity;
+  t.steps.forEach(s=>{
+    s.heap.forEach(n=>{ if(!(n.addr in size)) order.push(n.addr); size[n.addr]=n.size||16; });
+    s.frames.forEach(f=>f.vars.forEach(v=>{ if(v.addr){ lo=Math.min(lo,v.addr); hi=Math.max(hi,v.addr+(v.size||8)); } }));
+  });
+  const H={}; let next=0x100;
+  order.forEach(a=>{ H[a]=next; next+=Math.ceil((size[a]+16)/0x100)*0x100; });
+  MAP={heap:H, size, lo:lo===Infinity?0:lo-lo%16, hi:hi===-Infinity?0:hi};
+}
+function simpleOf(a){                                /* real address -> simple one, or null */
+  if(MAP.heap[a]!==undefined) return MAP.heap[a];
+  for(const k in MAP.heap){ const b=+k; if(a>b&&a<b+MAP.size[k]) return MAP.heap[k]+(a-b); }   /* inside a block */
+  for(const k in MAP.heap){ const b=+k; if(a>=b-16&&a<b) return MAP.heap[k]-(b-a); }          /* its malloc header */
+  if(MAP.lo&&a>=MAP.lo&&a<MAP.hi+64) return 0x7ffd0000+(a-MAP.lo);                             /* our stack frames */
+  return null;
+}
+function show(a){
+  if(a===null||a===undefined) return "??";
+  if(a===0) return "NULL";
+  const m=simple?simpleOf(a):null;
+  return "0x"+(m===null?a:m).toString(16);
+}
+const real=a=>a===null||a===undefined?"":"0x"+a.toString(16);
+
+/* ---------- what changed since the previous step ---------- */
+function snap(s){
+  const o={};
+  s.frames.forEach(f=>f.vars.forEach(v=>o["v:"+v.addr]=f.func+"|"+v.name+"|"+v.value));
+  s.heap.forEach(n=>{ o["h:"+n.addr+":freed"]=String(!!n.freed); (n.fields||[]).forEach(f=>o["h:"+n.addr+":"+f.name]=String(f.value)); });
+  o.out=s.out||"";
+  o.func=s.func;
+  return o;
+}
+function changed(i){
+  if(i===0) return new Set();
+  const a=snap(TRACE.steps[i-1]), b=snap(TRACE.steps[i]), t=new Set();
+  for(const k in b) if(a[k]!==b[k]) t.add(k);
+  return t;
+}
+function reachable(s){
+  const live=new Set(), byAddr={}, q=[];
+  s.heap.forEach(n=>byAddr[n.addr]=n);
+  s.frames.forEach(f=>f.vars.forEach(v=>{ if(v.struct&&v.value&&v.init!==false) q.push(v.value); }));   /* leftovers are not references */
+  if(s.ret&&/\*\s*$/.test(s.ret.type||"")&&s.ret.value) q.push(s.ret.value);                     /* a pointer just returned is still held (in rax) */
+  while(q.length){
+    const p=q.shift();
+    if(!p||!byAddr[p]||live.has(p)) continue;
+    live.add(p);
+    if(byAddr[p].freed) continue;
+    (byAddr[p].fields||[]).forEach(fd=>{ if(fd.kind==="ptr"&&fd.value) q.push(fd.value); });
+  }
+  return live;
+}
+
+/* ---------- which locals are set yet: parameters start with real values, other locals with leftover bytes ---------- */
+function ranAt(i){                                              /* the line that just ran, and the frame it ran in */
+  if(!TRACE||i<=0) return null;
+  const P=TRACE.steps[i-1], S=TRACE.steps[i];
+  if(S.frames.length<P.frames.length&&P.frames[1]) return {line:P.frames[1].at||P.line, fr:P.frames[1], ret:true};   /* a return: the call's line finished too */
+  return {line:P.line, fr:P.frames[0], call:S.frames.length>P.frames.length};
+}
+const elemOf=t=>(t||"").replace(/\s*\[\d*\]\s*$/,"");                 /* int [6] -> int */
+const codeAt=l=>SRC?(SRC[l-1]||"").replace(/\/\/.*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g," "):"";
+function writes(code,name){                                     /* does this line assign to name? */
+  const n=name.replace(/\W/g,"");
+  return new RegExp(`(^|[^\\w.>])${n}\\s*(\\[[^\\]]*\\]\\s*)*(=(?!=)|[-+*/%&|^]=|<<=|>>=|\\+\\+|--)|(\\+\\+|--)\\s*${n}\\b|&\\s*${n}\\b`).test(code);
+}
+function markInit(t){                                           /* v.init: written since it came into scope */
+  const on=t.steps.some(s=>s.frames.some(f=>f.vars.some(v=>"arg" in v)));
+  let prev={};
+  t.steps.forEach((s,i)=>{
+    const cur={}, RA=i>0?ranAt(i):null, code=RA&&!RA.call?codeAt(RA.line):"", pf=RA&&RA.fr?RA.fr.func:null;   /* a call's line isn't done yet */
+    s.frames.forEach(f=>f.vars.forEach(v=>{
+      const id=v.addr+"|"+f.func+"|"+v.name, old=prev[id];
+      v.init=!on||!!v.arg||(old!==undefined&&(old.init||old.bytes!==v.bytes||(pf===f.func&&writes(code,v.name))));
+      cur[id]={init:v.init,bytes:v.bytes};
+    }));
+    prev=cur;
+  });
+}
+const CHUNK={malloc:["malloc's own","not yours — malloc's"],tcache:["malloc's own table","not yours — malloc's"],stdout:["stdout's buffer","not yours — printf's"],stdin:["stdin's buffer","not yours — scanf/fgets"]};
+const ownChunk=c=>c.what||(TRACE&&!TRACE.allocs_tracked&&c.state==="used"&&[0x250,0x290,0x300].includes(c.size)?"malloc":null);
+const chunkText=c=>c.state==="top"?["not allocated","free space at the end"]:CHUNK[ownChunk(c)]||(c.state==="freed"?["freed",""]:["in use","no pointer to it seen"]);
+
+/* ---------- what the line that just ran touched: what it changed, and what it read on the way ---------- */
+function touched(i){
+  const T={ch:changed(i), inv:new Set(), on:false};
+  if(i===0) return T;
+  const P=TRACE.steps[i-1], S=TRACE.steps[i], inS={}, hot=new Set();
+  S.heap.forEach(n=>inS[n.addr]=n);
+  const RA=ranAt(i);
+  if(SRC&&RA&&RA.fr){                                            /* names on that line, followed through -> */
+    const code=codeAt(RA.line);
+    const vars={}, inP={}; RA.fr.vars.forEach(v=>vars[v.name]=v); P.heap.forEach(n=>inP[n.addr]=n);
+    const re=/([A-Za-z_]\w*)((?:\s*->\s*[A-Za-z_]\w*)*)/g; let m;
+    while((m=re.exec(code))){
+      const v=vars[m[1]]; if(!v) continue;
+      T.inv.add("v:"+v.addr);
+      let p=v.kind==="ptr"?v.value:0;
+      for(const f of m[2].split("->").slice(1).map(x=>x.trim())){
+        const b=inP[p]; if(!b) break;
+        T.inv.add("b:"+b.addr); T.inv.add("h:"+b.addr+":"+f);
+        const fd=(b.fields||[]).find(x=>x.name===f); p=fd&&fd.kind==="ptr"?fd.value:0;
+      }
+    }
+  }
+  S.frames.forEach(f=>f.vars.forEach(v=>{ if(v.kind==="ptr"&&v.init!==false&&T.ch.has("v:"+v.addr)&&inS[v.value]) hot.add(v.value); }));
+  S.heap.forEach(n=>{ if(!n.freed) (n.fields||[]).forEach(fd=>{ if(fd.kind==="ptr"&&T.ch.has("h:"+n.addr+":"+fd.name)&&inS[fd.value]) hot.add(fd.value); }); });
+  hot.forEach(a=>T.inv.add("b:"+a));                                                              /* where a changed pointer now leads */
+  S.frames.forEach(f=>f.vars.forEach(v=>{ if(v.kind==="ptr"&&v.init!==false&&hot.has(v.value)) T.inv.add("v:"+v.addr); }));   /* other ways to reach it */
+  const Rp=reachable(P), Rs=reachable(S);
+  S.heap.forEach(n=>{ if(!n.freed&&!Rs.has(n.addr)&&Rp.has(n.addr)) T.inv.add("b:"+n.addr); });          /* leaked by this line */
+  T.on=[...T.ch].some(k=>k.startsWith("v:")||k.startsWith("h:"))||T.inv.size>0;
+  return T;
+}
+
+/* ---------- how the running function gets to each box: expressions built from its own variables ---------- */
+const REACH="#1D4ED8";
+const addrType=t=>t?(t.endsWith("*")?t+"*":t+" *"):"";
+const short=t=>(t||"").replace(/struct /g,"");
+function reach(s){                                               /* R["v:addr" | "b:addr" | "h:addr:field"] = {v, a, t} */
+  const R={}, D={}; Object.defineProperty(R,"_D",{value:D}); if(!s.frames.length) return R;   /* D: every box it can reach, even by a long path */
+  const blocks=s.heap.filter(n=>!n.freed), stack={}, q=[];
+  s.frames.forEach(f=>f.vars.forEach(v=>{ if(v.addr) stack[v.addr]=v; }));
+  const par=x=>/^[*&]/.test(x)?`(${x})`:x;                       /* x->f needs (x) when x starts with * or & */
+  const put=(k,val,adr,type,next,d)=>{ const first=!(k in D); if(first) D[k]=d;
+    if(val.length<=24){ if(!R[k]) R[k]={v:val,a:adr,t:type,alt:[],d};                                /* too long to draw: still counts as reachable */
+      else if(R[k].v!==val&&R[k].alt.length<3&&!R[k].alt.some(o=>o.v===val)) R[k].alt.push({v:val,a:adr}); }   /* another way there */
+    if(first&&next) q.push(next); };                            /* d: how many hops away */
+  const follow=(x,v,d)=>v.kind==="ptr"&&v.init!==false&&v.value?{x,p:v.value,t:v.target,d}:null;
+  s.frames[0].vars.forEach(v=>put("v:"+v.addr,v.name,"&"+v.name,v.type,follow(v.name,v,0),0));
+  while(q.length){
+    const {x,p,t,d:d0}=q.shift(), sv=stack[p], d=d0+1;
+    if(sv&&(!t||t===sv.type)){ put("v:"+p,"*"+x,x,sv.type,follow("*"+x,sv,d),d); continue; }   /* another variable, like main's head */
+    if(sv&&t===elemOf(sv.type)){ if(!(("v:"+p) in D)) D["v:"+p]=d; continue; }                 /* the start of an array: reachable, no tag */
+    const b=blocks.find(n=>p>=n.addr&&p<n.addr+(n.size||16)); if(!b) continue;
+    if(p===b.addr){                                                                      /* a node, and the fields in it */
+      put("b:"+b.addr,"*"+x,x,b.type,null,d);
+      (b.fields||[]).forEach(f=>put("h:"+b.addr+":"+f.name,par(x)+"->"+f.name,"&"+par(x)+"->"+f.name,f.type,follow(par(x)+"->"+f.name,f,d),d));
+    } else {                                                                              /* a field inside a node, like &n->next */
+      const f=(b.fields||[]).find(f=>b.addr+f.offset===p);
+      if(f) put("h:"+b.addr+":"+f.name,"*"+x,x,f.type,follow("*"+x,f,d),d);
+    }
+  }
+  return R;
+}
+const reachTip=(rc,who)=>rc?`\n${who} gets it with ${rc.v}  (${rc.t})\nits address is ${rc.a}  (${addrType(rc.t)})\nchange it: ${rc.v} = …;`+
+  (rc.alt.length?`\nalso: ${rc.alt.map(o=>o.v).join(", ")}`:""):"";
+const orText=(a,alts,max)=>alts.length?(a.length+4+alts[0].length<=max?`${a} or ${alts[0]}`:`${a} +${alts.length}`):a;   /* "head or *pp", or "head +1" if too long */
+
+/* ---------- at a call: where each parameter's value came from ---------- */
+function callInfo(s){
+  const I={}; if(at===0||s.frames.length<2) return I;
+  const P=TRACE.steps[at-1]; if(P.frames.length>=s.frames.length) return I;          /* only on the step a call happens */
+  const f=s.frames[0], caller=s.frames[1], params=f.vars.filter(v=>v.arg), cv={};
+  caller.vars.forEach(v=>cv[v.name]=v);
+  let args=null; const code=codeAt(P.line), m=code.indexOf(f.func+"(");
+  if(m>=0){ let d=0, cur=""; args=[];                                                  /* split the call's arguments */
+    for(const ch of code.slice(m+f.func.length+1)){
+      if(ch===")"&&d===0){ args.push(cur); break; }
+      if(ch==="("||ch==="[") d++; else if(ch===")"||ch==="]") d--;
+      if(ch===","&&d===0){ args.push(cur); cur=""; } else cur+=ch;
+    }
+    args=args.map(a=>a.trim()).filter(Boolean); }
+  params.forEach((p,i)=>{
+    const a=args&&args[i]!==undefined?args[i]:null; let r=null;
+    if(a){ const am=a.match(/^&\s*([A-Za-z_]\w*)$/);
+      if(am&&cv[am[1]]) r={text:`got &${am[1]} from ${caller.func}`,src:cv[am[1]]};
+      else if(cv[a]) r={text:/\[/.test(cv[a].type)?`got &${a}[0] from ${caller.func}`:`got a copy of ${caller.func}'s ${a}`,src:cv[a]};   /* an array passes its address */
+      else r={text:`got a copy of ${a}`}; }
+    else { const byAddr=caller.vars.find(v=>v.addr===p.value), byVal=p.kind==="ptr"&&p.value&&caller.vars.find(v=>v.kind==="ptr"&&v.value===p.value);   /* no .c: go by value */
+      if(byAddr) r={text:`got &${byAddr.name} from ${caller.func}`,src:byAddr};
+      else if(byVal) r={text:`got a copy of ${caller.func}'s ${byVal.name}`,src:byVal}; }
+    if(r) I["v:"+p.addr]=r;
+  });
+  return I;
+}
+
+/* ---------- ladder panel: &x, x, *x, **x ... for the variable you click ---------- */
+let LADDER=null;
+function ladderHTML(s){
+  if(!LADDER) return "";
+  const [addr,func,name]=LADDER.split("|"); let f=null, v=null;
+  s.frames.forEach(fr=>{ if(!v&&fr.func===func){ const u=fr.vars.find(u=>String(u.addr)===addr&&u.name===name); if(u){ f=fr; v=u; } } });
+  const top=`<div class="ladder"><span class="lx" title="close">×</span><button class="lw" data-watch="${esc(func)}|${esc(name)}" title="follow ${esc(name)} through the whole trace">Watch ${esc(name)}</button>`;
+  if(!v) return top+`<div class="lt"><b>${esc(name)}</b> <span>isn't in scope at this step</span></div></div>`;
+  const stackAt={}, fnOf={}; s.frames.forEach(fr=>fr.vars.forEach(u=>{ if(u.addr){ stackAt[u.addr]=u; fnOf[u.addr]=fr.func; } }));
+  const vt=u=>u.init===false?"??":u.kind==="ptr"?show(u.value):u.kind==="int"?String(u.value):"—";
+  const par=x=>/^[*&]/.test(x)?`(${x})`:x;
+  const rows=[["&"+v.name,show(v.addr),addrType(v.type),`where ${v.name}'s box is`],[v.name,vt(v),v.type,`what's in ${v.name}'s box`]];
+  let x=v.name, cur=v, node=null;
+  for(let i=0;i<4&&cur.kind==="ptr";i++){
+    const nx="*"+x, tg=cur.target||"";
+    if(cur.init===false){ rows.push([nx,"??",tg,"not set yet, so following it is a bug"]); break; }
+    if(!cur.value){ rows.push([nx,"—",tg,"NULL: there's nothing to follow"]); break; }
+    const sv=stackAt[cur.value];
+    if(sv&&(!cur.target||cur.target===sv.type)){ rows.push([nx,vt(sv),sv.type,`what's in ${fnOf[sv.addr]}'s ${sv.name}`+(sv.decl?` (line ${sv.decl})`:"")]); x=nx; cur=sv; continue; }
+    const b=s.heap.find(n=>cur.value>=n.addr&&cur.value<n.addr+(n.size||16));
+    if(b&&cur.value===b.addr){ rows.push([nx,`the node at ${show(b.addr)}`,b.type,b.freed?"freed, so using it is a bug":"the whole node"]); x=nx; node=b; break; }
+    const fd=b&&(b.fields||[]).find(fd=>b.addr+fd.offset===cur.value);
+    if(fd){ rows.push([nx,vt(fd),fd.type,`the ${fd.name} field of the node at ${show(b.addr)}`]); x=nx; cur=fd; continue; }
+    rows.push([nx,"?",tg,"memory this trace doesn't show"]); break;
+  }
+  if(node&&!node.freed) (node.fields||[]).forEach(fd=>rows.push([`${par(x.slice(1))}->${fd.name}`,vt(fd),fd.type,`its ${fd.name} field`]));
+  return top+`<div class="lt">ladder for <b>${esc(v.name)}</b><span>${v.arg?"parameter":"local"} of ${esc(f.func)}${v.decl?`, line ${v.decl}`:""}</span></div><table>`+
+    rows.map(r=>`<tr><td class="e">${esc(r[0])}</td><td>${esc(r[1])}</td><td class="t">${esc(r[2])}</td><td class="t">${esc(r[3])}</td></tr>`).join("")+
+    `</table><div class="lh">each * follows one arrow · & goes one step back · -> reads a field of the node</div></div>`;
+}
+
+/* ---------- hops: follow an expression like (*head)->val on this step, one box at a time ---------- */
+function evalExpr(s, frame, text){                              /* -> {hops:[{box, from}], r} or {hops, err} */
+  const toks=text.match(/->|[*&().\[\]]|[A-Za-z_]\w*|\d+|\S/g)||[], hops=[], stackAt={};
+  s.frames.forEach(f=>f.vars.forEach(v=>{ if(v.addr) stackAt[v.addr]=v; }));
+  let i=0;
+  const fail=(m,addr)=>{ const e=new Error(m); e.addr=addr; throw e; };
+  const place=(e,key,u,extra)=>Object.assign({e,key,kind:u.kind,value:u.value,type:u.type,target:u.target,init:u.init,bytes:u.bytes,size:u.size},extra);
+  const SZ={char:1,short:2,int:4,long:8,float:4,double:8};
+  const readAt=(a,w)=>{                                          /* w bytes at address a: whose box, and the value */
+    for(const f of s.frames) for(const v of f.vars) if(v.addr&&v.bytes&&a>=v.addr&&a+w<=v.addr+v.size){ const b=hx(v.bytes).slice(a-v.addr,a-v.addr+w); return {key:"v:"+v.addr,b}; }
+    for(const n of s.heap) if(n.bytes&&!n.freed&&a>=n.addr&&a+w<=n.addr+n.size){ const b=hx(n.bytes).slice(a-n.addr,a-n.addr+w); return {key:"b:"+n.addr,b}; }
+    return null; };
+  const elemVal=(b,T)=>{ let v=le(b); if(!/unsigned|\*/.test(T)&&v>=(1n<<BigInt(8*b.length-1))) v-=(1n<<BigInt(8*b.length)); return /\*/.test(T)?show(num(v)):String(v); };
+  const index=pl=>{                                              /* pl[ index ] */
+    const it=toks[i++]; if(toks[i++]!=="]") fail("a ] is missing");
+    let k; if(/^\d+$/.test(it)) k=+it; else { const iv=frame.vars.find(v=>v.name===it);
+      if(!iv||iv.kind!=="int") fail(`${it} isn't an int in ${frame.func}`); if(iv.init===false) fail(`${it} isn't set yet`); k=iv.value; }
+    const m=(pl.type||"").match(/^(.*?)\s*\[(\d+)\]\s*$/);
+    if(m){ const n=+m[2], w=pl.size/n, T=m[1].trim(); if(k<0||k>=n) fail(`${k} is outside ${pl.e}, which has ${n} elements`);
+      const b=pl.bytes?hx(pl.bytes).slice(k*w,(k+1)*w):null;
+      hops.push({box:pl.key,from:null});
+      return {e:`${pl.e}[${k}]`,key:pl.key,kind:"elem",txt:b&&b.length===w?elemVal(b,T):"?",type:T,addr:pl.addr+k*w}; }
+    if(pl.kind==="ptr"){ const T=(pl.target||"").trim(), w=/\*$/.test(T)?8:SZ[T.replace(/^(unsigned|signed)\s+/,"")];
+      if(!w) fail(`can't index through a ${pl.type}`); if(pl.init===false) fail(`${pl.e} isn't set yet`); if(!pl.value) fail(`${pl.e} is NULL`);
+      const got=readAt(pl.value+k*w,w); if(!got) fail(`${pl.e}[${k}] is somewhere this trace doesn't show`);
+      hops.push({box:got.key,from:pl.key});
+      return {e:`${pl.e}[${k}]`,key:got.key,kind:"elem",txt:elemVal(got.b,T),type:T,addr:pl.value+k*w}; }
+    fail(`${pl.e} isn't an array or a pointer`); };
+  const deref=pl=>{                                              /* follow the arrow out of pl's box */
+    if(pl.kind!=="ptr") fail(`${pl.e} isn't a pointer, so there's no arrow to follow`);
+    if(pl.init===false) fail(`${pl.e} isn't set yet, so following it is a bug`);
+    if(!pl.value) fail(`${pl.e} is NULL: there's nothing to follow`);
+    const p=pl.value, sv=stackAt[p];
+    if(sv&&(!pl.target||pl.target===sv.type||pl.target===elemOf(sv.type))) return place("*"+pl.e,"v:"+p,sv,{addr:p});
+    const b=s.heap.find(n=>p>=n.addr&&p<n.addr+(n.size||16));
+    if(b&&b.freed) fail(`${pl.e} points to a freed block, so using it is a bug`,b.addr);
+    if(b&&p===b.addr) return {e:"*"+pl.e,key:"b:"+b.addr,kind:"node",node:b,type:b.type,addr:b.addr};
+    const fd=b&&(b.fields||[]).find(f=>b.addr+f.offset===p);
+    if(fd) return place("*"+pl.e,"h:"+b.addr+":"+fd.name,fd,{addr:p});
+    fail(`${pl.e} points somewhere this trace doesn't show`);
+  };
+  const field=(nd,f,e)=>{ const fd=(nd.node.fields||[]).find(x=>x.name===f); if(!fd) fail(`that node has no field called ${f}`);
+    return place(e,"h:"+nd.node.addr+":"+fd.name,fd,{addr:nd.node.addr+fd.offset}); };
+  const par=e=>/^[*&]/.test(e)?`(${e})`:e;
+  function unary(){
+    if(toks[i]==="*"){ i++; const pl=unary(), r=deref(pl); hops.push({box:r.key,from:pl.key}); return r; }
+    if(toks[i]==="&"){ i++; const pl=unary(); return {e:"&"+pl.e,key:pl.key,kind:"addr",value:pl.addr,type:addrType(pl.type)}; }
+    return postfix();
+  }
+  function postfix(){
+    let pl=primary();
+    while(toks[i]==="->"||toks[i]==="."||toks[i]==="["){
+      if(toks[i]==="["){ i++; pl=index(pl); continue; }
+      const op=toks[i++], f=toks[i++]||"";
+      if(!/^[A-Za-z_]\w*$/.test(f)) fail("a field name has to come next");
+      if(op==="->"){ const nd=deref(pl); if(nd.kind!=="node") fail(`${pl.e} doesn't point to a node`);
+        const r=field(nd,f,`${par(pl.e)}->${f}`); hops.push({box:r.key,from:pl.key}); pl=r; }
+      else { if(pl.kind!=="node") fail(`${pl.e} isn't a node, so .${f} doesn't work`);
+        const r=field(pl,f,`${par(pl.e)}.${f}`); hops.push({box:r.key,from:null}); pl=r; }
+    }
+    return pl;
+  }
+  function primary(){
+    const t=toks[i];
+    if(t==="("){ i++; const pl=unary(); if(toks[i++]!==")") fail("a ) is missing"); return pl; }
+    if(t&&/^[A-Za-z_]\w*$/.test(t)){ i++; const v=frame.vars.find(v=>v.name===t);
+      if(!v) fail(`${t} isn't a variable in ${frame.func}`);
+      hops.push({box:"v:"+v.addr,from:null}); return place(t,"v:"+v.addr,v,{addr:v.addr}); }
+    fail("that isn't something the viewer can follow");
+  }
+  try{ const r=unary(); if(i<toks.length) fail("only * & -> . [ ] and ( ) can be followed here"); return {hops,r}; }
+  catch(err){ return {hops,err:err.message,errAddr:err.addr}; }
+}
+function hopText(ex,res){
+  if(res.err) return `${ex}\n${res.err}`;
+  const r=res.r, n=res.hops.filter(h=>h.from).length;
+  const v=r.kind==="node"?`the node at ${show(r.node.addr)}`:r.kind==="addr"?show(r.value):r.kind==="elem"?r.txt:r.init===false?"?? (not set yet)":
+          r.kind==="ptr"?show(r.value):r.kind==="int"?String(r.value):"—";
+  const where=r.kind!=="addr"&&r.addr!=null?`\nat ${show(r.addr)}${simple?` (real ${real(r.addr)})`:""}`:"";
+  return `${ex} = ${v}\n${r.type}${n?`, following ${n} arrow${n>1?"s":""}`:""}${where}`;
+}
+function showHops(res){                                          /* light up each box, and the arrow into it, one hop at a time */
+  clearHops(); const pic=$("pic"), hops=res.hops||[];
+  if(view==="cards"){
+    const svg=pic.querySelector("svg"); if(!svg) return;
+    let g="";
+    hops.forEach((h,i)=>{
+      const el=svg.querySelector(`[data-box="${h.box}"]`); if(!el) return;
+      const bb=el.getBBox(), d=i*450;
+      if(h.from){ const ar=svg.querySelector(`[data-arrow="${h.from}"]`);
+        if(ar) g+=`<path d="${ar.getAttribute("d")}" fill="none" stroke="${REACH}" stroke-width="3.6" stroke-linecap="round" class="hopin" style="animation-delay:${d-220}ms"/>`; }
+      g+=`<rect x="${bb.x-4}" y="${bb.y-4}" width="${bb.width+8}" height="${bb.height+8}" rx="10" fill="none" stroke="${REACH}" stroke-width="2.6" class="hopin" style="animation-delay:${d}ms"/>`+
+         `<circle cx="${bb.x-2}" cy="${bb.y-2}" r="9" fill="${REACH}" class="hopin" style="animation-delay:${d}ms"/>`+
+         `<text x="${bb.x-2}" y="${bb.y+2}" font-size="11" font-weight="700" text-anchor="middle" fill="#fff" class="hopin" style="animation-delay:${d}ms">${i+1}</text>`;
+    });
+    svg.insertAdjacentHTML("beforeend",`<g class="hops">${g}</g>`);
+  } else {
+    hops.forEach((h,i)=>{
+      const el=pic.querySelector(`[data-box~="${h.box}"]`);
+      if(el){ el.classList.add("hopbox"); el.dataset.hop=i+1; el.style.setProperty("--hd",`${i*450}ms`); }
+      const ar=h.from&&pic.querySelector(`svg.arrows [data-arrow="${h.from}"]`);
+      if(ar){ ar.classList.add("hoparrow"); ar.style.animationDelay=`${i*450-220}ms`; }
+    });
+  }
+}
+function clearHops(){
+  const pic=$("pic"); pic.querySelectorAll(".hops").forEach(x=>x.remove());
+  pic.querySelectorAll(".hopbox").forEach(x=>{ x.classList.remove("hopbox"); delete x.dataset.hop; x.style.removeProperty("--hd"); });
+  pic.querySelectorAll(".hoparrow").forEach(x=>{ x.classList.remove("hoparrow"); x.style.animationDelay=""; });
+}
+/* expressions in the code pane you can hover: *head, (*head)->val, current->next ... */
+let EXNAMES=null, EXC=new Map(), FNL=null;
+function exLine(line){
+  if(EXC.has(line)) return EXC.get(line);
+  const spans=exprSpans(line);
+  let html="", last=0;
+  spans.forEach(([a,b])=>{ html+=esc(line.slice(last,a))+`<span class="ex" data-ex="${esc(line.slice(a,b))}">${esc(line.slice(a,b))}</span>`; last=b; });
+  html+=esc(line.slice(last)); EXC.set(line,html); return html;
+}
+function exprSpans(line){                                         /* [start,end) of each expression worth following on this line */
+  if(!EXNAMES){ EXNAMES=new Set(); if(TRACE) TRACE.steps.forEach(s=>s.frames.forEach(f=>f.vars.forEach(v=>EXNAMES.add(v.name)))); }
+  const code=line.replace(/\/\/.*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g,m=>" ".repeat(m.length));
+  const toks=[], re=/->|&&|\|\||[*&().\[\]]|[A-Za-z_]\w*|\d+|\S/g, KW=new Set(["return","if","while","for","else","sizeof","case","switch","do"]);
+  let m; while((m=re.exec(code))) toks.push({t:m[0],a:m.index,b:m.index+m[0].length});
+  const id=t=>/^[A-Za-z_]\w*$/.test(t||"");
+  const tryAt=j=>{                                               /* the longest expression that starts at token j */
+    let p=j, base=null;
+    const unary=()=>{ if(toks[p]&&(toks[p].t==="*"||toks[p].t==="&")){ p++; return unary(); } return postfix(); };
+    const postfix=()=>{ if(!primary()) return false;
+      for(;;){ if(toks[p+1]&&(toks[p].t==="->"||toks[p].t===".")&&id(toks[p+1].t)) p+=2;
+        else if(toks[p+2]&&toks[p].t==="["&&(/^\d+$/.test(toks[p+1].t)||EXNAMES.has(toks[p+1].t))&&toks[p+2].t==="]") p+=3;
+        else break; }
+      return true; };
+    const primary=()=>{ const t=toks[p]&&toks[p].t;
+      if(t==="("){ const keep=p; p++; if(unary()&&toks[p]&&toks[p].t===")"){ p++; return true; } p=keep; return false; }
+      if(id(t)&&EXNAMES.has(t)&&!(toks[p+1]&&toks[p+1].t==="(")){ base=base||t; p++; return true; } return false; };
+    return unary()&&base?p:-1;
+  };
+  const spans=[]; let k=0;
+  while(k<toks.length){
+    const prev=toks[k-1], t=toks[k].t;
+    let q=k-1; while(q>=0&&toks[q].t==="*") q--;
+    const decl=q>=0&&id(toks[q].t)&&!EXNAMES.has(toks[q].t)&&!KW.has(toks[q].t);                        /* "ListNode **head": a declaration */
+    const binary=(t==="*"||t==="&")&&prev&&(id(prev.t)&&!KW.has(prev.t)||prev.t===")"||/^\d/.test(prev.t));   /* a * b is multiplication */
+    const e=decl||binary?-1:tryAt(k);
+    if(e>k){ spans.push([toks[k].a,toks[e-1].b]); k=e; } else k++;
+  }
+  return spans;
+}
+function fnOfLines(){                                            /* which function each source line belongs to */
+  const out=[]; let cur=null;
+  (SRC||[]).forEach((l,i)=>{ const m=l.match(/^[A-Za-z_][\w\s*]*?\b([A-Za-z_]\w*)\s*\([^;]*\)\s*\{?\s*$/);
+    if(m&&!/^(if|while|for|switch|return|else)$/.test(m[1])) cur=m[1]; out[i]=cur; });
+  return out;
+}
+/* ---------- the step right after a function returned: what came back, and where it's going ---------- */
+function retInfo(s){
+  const r=s.ret; if(!r||!s.frames.length) return null;
+  const RA=ranAt(at), m=codeAt(RA?RA.line:s.line).match(new RegExp(`(?:^|[^\\w.>])([A-Za-z_]\\w*)\\s*=\\s*${r.func}\\s*\\(`));
+  const recv=m?s.frames[0].vars.find(v=>v.name===m[1]):null;
+  return {func:r.func, txt:/\*\s*$/.test(r.type)?show(r.value):String(r.value), recv, stored:!!recv&&recv.value===r.value};
+}
+
+/* ---------- arrays: 6 1 6 6 6 666, or "bob" for a char array ---------- */
+function arrParts(type,size,hex){                                /* one string per element, or null if it isn't an array we can read */
+  const m=(type||"").match(/^(.*?)\s*\[(\d*)\]\s*$/); if(!m||!hex||!size) return null;
+  const el=m[1].trim(), b=hx(hex), n=+m[2]||0, w=n?size/n:0;
+  if(!b.length||!w||w!==Math.round(w)||w>8) return null;
+  const cnt=Math.min(n||1e9, Math.floor(b.length/w));
+  const raw=i=>le(b.slice(i*w,(i+1)*w));
+  if(/\*/.test(el)) return Array.from({length:cnt},(_,i)=>show(num(raw(i))));
+  if(/char/.test(el)&&w===1){                                    /* a string, when it looks like one */
+    let s="", ok=true;
+    for(let i=0;i<cnt;i++){ const c=Number(raw(i)); if(!c) break; if(c<32||c>126){ ok=false; break; } s+=String.fromCharCode(c); }
+    if(ok) return [`"${s}"`];
+  }
+  if(/float|double/.test(el)) return null;
+  const signed=!/unsigned/.test(el);
+  return Array.from({length:cnt},(_,i)=>{ let v=raw(i); if(signed&&v>=(1n<<BigInt(8*w-1))) v-=(1n<<BigInt(8*w)); return String(v); });
+}
+function arrText(type,size,hex,max){
+  const p=arrParts(type,size,hex); if(!p) return null;
+  let s=p.join(" ");
+  if(max&&s.length>max){ s=""; for(const x of p){ if((s+" "+x).length>max-1){ s+=" …"; break; } s+=(s?" ":"")+x; } }
+  return s;
+}
+function sysSlot(f,a,fb,lo){                                      /* return addr, saved rbp, stack canary, or not used */
+  if(a===f.rbp+8) return {name:"return addr",tip:"where this function returns to"};
+  if(a===f.rbp) return {name:"saved rbp",tip:"the caller's frame pointer, saved when this function started"};
+  const b=fb.slice(a-lo,a-lo+8);
+  if(a===f.rbp-8&&b[0]==="00"&&b.some(x=>x!=="00")) return {name:"stack canary",tip:"a random value with a zero first byte; if a buffer overflow changes it, the program stops when this function returns"};
+  return {name:"not used",tip:a<f.rsp?"below the stack pointer (the red zone): a function that calls nothing can keep things here":"no variable uses these bytes (padding)"};
+}
+const fieldHex=(n,f)=>n.bytes&&f.offset!=null?n.bytes.slice(f.offset*2,(f.offset+f.size)*2):null;
+
+/* ---------- list line: one line per list, like head: 1 → 6 → 2 → NULL (3 nodes) ---------- */
+function listLines(s){
+  const byA={}, pointedAt=new Set(), heads={}, inner=s.frames[0], R=reachable(s);
+  s.heap.forEach(n=>{ byA[n.addr]=n; if(!n.freed&&R.has(n.addr)) (n.fields||[]).forEach(f=>{ if(f.kind==="ptr"&&f.value) pointedAt.add(f.value); }); });
+  const nextOf=n=>{ const ps=(n.fields||[]).filter(f=>f.kind==="ptr"&&(!f.target||f.target===n.type)); return ps.length===1?ps[0]:null; };
+  const valOf=n=>{ const f=(n.fields||[]).find(f=>f.kind==="int"); return f?String(f.value):show(n.addr); };
+  s.frames.forEach(f=>f.vars.forEach(v=>{                        /* a list starts where a variable points and no node does */
+    if(!v.struct||v.init===false||!v.value) return;
+    const n=byA[v.value]; if(!n||(!n.freed&&(pointedAt.has(v.value)||!nextOf(n)))) return;
+    (heads[v.value]=heads[v.value]||[]).push((f===inner?"":f.func+"'s ")+v.name);
+  }));
+  return Object.entries(heads).map(([a,names])=>{
+    let p=+a, parts=[], end="NULL", bad=false; const seen=new Set();
+    while(p){
+      const n=byA[p];
+      if(!n){ end=`${show(p)} (not a block)`; bad=true; break; }
+      if(n.freed){ end=`${show(p)} (freed!)`; bad=true; break; }
+      if(seen.has(p)){ end=`cycle! back to ${valOf(n)}`; bad=true; break; }
+      seen.add(p); parts.push(valOf(n));
+      if(parts.length>40){ end="…"; break; }
+      const nx=nextOf(n); p=nx?nx.value:0;
+    }
+    return {head:+a, names:names.join(", "), text:parts.concat([end]).join(" → "), count:parts.length, bad};
+  });
+}
+function heapOrder(s,blocks){                                     /* lay the cards out along the lists, so arrows stop crossing */
+  const byA={}, out=[], seen=new Set(); blocks.forEach(n=>byA[n.addr]=n);
+  listLines(s).forEach(l=>{ let p=l.head;
+    while(p&&byA[p]&&!seen.has(p)){ seen.add(p); out.push(byA[p]);
+      const nx=(byA[p].fields||[]).find(f=>f.kind==="ptr"&&(!f.target||f.target===byA[p].type)); p=nx?nx.value:0; } });
+  blocks.forEach(n=>{ if(!seen.has(n.addr)) out.push(n); });
+  return out;
+}
+/* ---------- leak report, on the last step: what was never freed ---------- */
+const RCACHE=new Map();
+const reachAt=i=>{ if(!RCACHE.has(i)) RCACHE.set(i,reachable(TRACE.steps[i])); return RCACHE.get(i); };
+function leakHTML(s){
+  if(!TRACE||at!==TRACE.steps.length-1) return "";
+  const R=reachAt(at), lost=[], kept=[];
+  s.heap.forEach(n=>{ if(!n.freed) (R.has(n.addr)?kept:lost).push(n); });
+  const other=(s.chunks||[]).filter(c=>c.state==="used"&&!ownChunk(c)&&!s.heap.some(n=>n.addr===c.addr));
+  const lostOn=n=>{ for(let i=at;i>0;i--){ const P=TRACE.steps[i-1];                    /* the line after which nothing pointed to it */
+      if(P.heap.some(b=>b.addr===n.addr&&!b.freed)&&reachAt(i-1).has(n.addr)){ const RA=ranAt(i); return `lost on line ${RA?RA.line:P.line} (step ${i+1})`; } } return ""; };
+  const bytes=list=>list.reduce((t,n)=>t+(n.size||0),0);
+  const rows=(list,why)=>`<table>${list.map(n=>`<tr><td class="e">${show(n.addr)}</td><td>${esc(short(n.type))}, ${n.size} bytes</td><td class="t">${esc(why(n))}</td></tr>`).join("")}</table>`;
+  const plural=(k,w)=>`${k} ${w}${k===1?"":"s"}`;
+  let body="";
+  if(lost.length) body+=`<div class="lb bad">${plural(lost.length,"block")}, ${bytes(lost)} bytes lost: nothing points to them anymore</div>`+rows(lost,lostOn);
+  if(kept.length) body+=`<div class="lb">${plural(kept.length,"block")}, ${bytes(kept)} bytes never freed: still reachable at the end, but never passed to free()</div>`+rows(kept,()=>"still reachable");
+  if(other.length) body+=`<div class="lb">${plural(other.length,"other chunk")} still in use that no traced pointer pointed to (maybe not yours)</div>`;
+  if(!body) body=`<div class="lb good">No leaks: every block was freed.</div>`;
+  if(BUGS.length) body+=`<div class="lb bad">${BUGS.length} bug${BUGS.length===1?"":"s"} during the run</div><table>${BUGS.map(b=>`<tr data-go="${b.step}" style="cursor:pointer"><td class="e">step ${b.step+1}</td><td>line ${b.line}</td><td class="t">${esc(bugText(b,b.step))}</td></tr>`).join("")}</table>`;
+  return `<div class="ladder leak"><div class="lt">Leak report <span>at the end of the trace</span></div>${body}</div>`;
+}
+
+/* ---------- gdb watchpoints: bytes a library call (free, malloc, memset …) wrote into your memory ---------- */
+function libBytes(s){                                              /* byte address -> {func, in, old, now}, for this step */
+  if(s._lib) return s._lib;
+  const M=new Map();
+  (s.lib||[]).forEach(c=>(c.writes||[]).forEach(w=>{ const o=hx(w.old), n=hx(w.new);
+    for(let k=0;k<(w.size||8);k++) if(o[k]!==n[k]){ const was=M.get(w.addr+k); M.set(w.addr+k,{func:c.func,in:w.in,old:was?was.old:o[k],now:n[k]}); } }));
+  Object.defineProperty(s,"_lib",{value:M});                      /* not saved with the trace */
+  return M;
+}
+function libIn(s,a,size){                                          /* did a library call write into [a, a+size) on this step? */
+  const M=libBytes(s); let n=0, func=null;
+  for(let k=0;k<size;k++){ const b=M.get(a+k); if(b){ n++; func=func||b.func; } }
+  return n?{n,func}:null;
+}
+const libTip=(s,a,size)=>{ const w=libIn(s,a,size); return w?`\n${w.func}() wrote ${w.n} byte${w.n===1?"":"s"} here on this line: a gdb watchpoint caught it`:""; };
+function keyRange(s,key){                                          /* [start, end) of a box: v:addr, b:addr or h:addr:field */
+  const b=key&&boxIn(s,key); if(!b) return null;
+  if(b.v) return [b.v.addr,b.v.addr+(b.v.size||8)];
+  if(b.fd) return b.fd.offset==null?null:[b.n.addr+b.fd.offset,b.n.addr+b.fd.offset+(b.fd.size||8)];
+  return [b.n.addr,b.n.addr+(b.n.size||16)];
+}
+function freeWrites(s,n){                                          /* the words free() wrote into block n, as a watchpoint saw them */
+  const ws=(s.lib||[]).filter(c=>c.func==="free"&&c.arg===n.addr).flatMap(c=>c.writes||[]);
+  const w=[...new Set(ws.map(x=>Math.floor((x.addr-n.addr)/8)).filter(k=>k>=0&&k*8<(n.size||16)))].sort((x,y)=>x-y);
+  return w.length?w:null;
+}
+function libWords(i){                                              /* "Inside free(), a gdb watchpoint caught …", for the words panel */
+  const S=TRACE.steps[i], P=TRACE.steps[i-1], out=[];
+  const fieldTxt=(n,fd)=>!n||!fd?"?":fd.kind==="ptr"?show(fd.value):fd.kind==="int"?String(fd.value):(arrText(fd.type,fd.size,fieldHex(n,fd),20)||"—");
+  (S.lib||[]).forEach(c=>{
+    const groups=new Map(), fn=kc(c.func+"()");
+    (c.writes||[]).forEach(w=>{ const o=hx(w.old), nw=hx(w.new), ks=[];
+      for(let k=0;k<8;k++) if(o[k]!==nw[k]) ks.push(w.addr+k);
+      if(!ks.length) return;
+      let t={key:"m:"+ks[0],a:ks[0]};                                /* whose bytes: a heap block, its header, or a variable */
+      for(const st of [S,P]){ if(t.n||t.v) break;
+        for(const n of st.heap){ if(ks[0]>=n.addr&&ks[0]<n.addr+(n.size||16)){ t={key:"b:"+n.addr,n}; break; }
+          if(ks[0]>=n.addr-16&&ks[0]<n.addr){ t={key:"hd:"+n.addr,hd:n}; break; } }
+        if(!t.n&&!t.hd) for(const f of st.frames){ const v=f.vars.find(v=>v.addr&&ks[0]>=v.addr&&ks[0]<v.addr+(v.size||8)); if(v){ t={key:"v:"+v.addr,v}; break; } } }
+      const g=groups.get(t.key)||{t,bytes:[]}; g.bytes.push(...ks); groups.set(t.key,g); });
+    groups.forEach(({t,bytes})=>{
+      if(t.n){
+        const pn=P.heap.find(b=>b.addr===t.n.addr), sn=S.heap.find(b=>b.addr===t.n.addr)||t.n, at=kc(show(t.n.addr));
+        const words=[...new Set(bytes.map(a=>Math.floor((a-t.n.addr)/8)))].sort((x,y)=>x-y), rng=k=>`+${k*8}…+${k*8+7}`;
+        const hit=fd=>fd.offset!=null&&bytes.some(a=>a-t.n.addr>=fd.offset&&a-t.n.addr<fd.offset+fd.size);
+        const old=(pn&&!pn.freed?pn.fields||[]:[]).filter(hit).map(fd=>fd.name);
+        if(c.func==="free"&&c.arg===t.n.addr){
+          const say=words.map(k=>k===0?`bytes ${kc(rng(k))} became a link to the next free block`:k===1?`bytes ${kc(rng(k))} became a random key that catches a double free`:`bytes ${kc(rng(k))} changed`);
+          out.push(`Inside ${fn}, a gdb watchpoint caught free() writing into the block at ${at}: ${say.join(", and ")}.`+(old.length?` So the old ${old.map(kc).join(" and ")} ${old.length===1?"is":"are"} overwritten.`:""));
+        } else if(/^(malloc|calloc|realloc)$/.test(c.func)&&pn&&pn.freed){
+          out.push(`Inside ${fn}, a gdb watchpoint caught ${c.func}() writing bytes ${words.map(k=>kc(rng(k))).join(" and ")} of the block at ${at}${words.includes(1)?" (it clears the old double-free key)":""}.`+
+            ` This block is recycled: free() had it before, so its other bytes are leftovers.`);
+        } else {
+          const fs=(sn.fields||[]).filter(hit);
+          out.push(`Inside ${fn}, a gdb watchpoint caught a write into the block at ${at}`+(fs.length&&!sn.freed?`: `+fs.map(fd=>{ const pf=pn&&(pn.fields||[]).find(x=>x.name===fd.name);
+            return `its ${kc(fd.name)} went from ${kc(fieldTxt(pn,pf))} to ${kc(fieldTxt(sn,fd))}`; }).join(", ")+".":`, bytes ${words.map(k=>kc(rng(k))).join(" and ")}.`));
+        }
+      }
+      else if(t.hd) out.push(`Inside ${fn}, a gdb watchpoint caught a write into malloc's header just above the block at ${kc(show(t.hd.addr))}.`);
+      else if(t.v){ const key="v:"+t.v.addr; out.push(`Inside ${fn}, a gdb watchpoint caught a write to ${kc(boxName(S,key,S.frames[0]?S.frames[0].func:""))}: ${kc(boxVal(P,key))} → ${kc(boxVal(S,key))}.`); }
+      else out.push(`Inside ${fn}, a gdb watchpoint caught a write at ${kc(show(t.a))}.`);
+    });
+  });
+  return out;
+}
+
+/* ---------- watches: follow one expression through the whole trace, like gdb's watch ---------- */
+let WATCH=[], WFN="", WEX="", WONLY=false;
+try{ WATCH=JSON.parse(localStorage.getItem("mv.watch")||"[]").filter(w=>w&&w.ex); }catch(e){ WATCH=[]; }
+const saveWatch=()=>{ try{ localStorage.setItem("mv.watch",JSON.stringify(WATCH.map(w=>({fn:w.fn,ex:w.ex})))); }catch(e){} };
+function watchAt(w,s){                                           /* its value on one step: {txt, key} */
+  const fr=w.fn?s.frames.find(f=>f.func===w.fn):s.frames[0];
+  if(!fr) return {txt:`${w.fn} isn't running`,off:true};
+  const res=evalExpr(s,fr,w.ex);
+  if(res.err) return /isn't a variable in/.test(res.err)?{txt:"not in scope here",off:true}:{txt:res.err,bad:true};
+  const r=res.r;
+  const txt=r.kind==="node"?`the node at ${show(r.node.addr)}`:r.kind==="addr"?show(r.value):r.kind==="elem"?r.txt:
+            r.init===false?"??":r.kind==="ptr"?show(r.value):r.kind==="int"?String(r.value):(arrText(r.type,r.size,r.bytes,48)||"—");
+  return {txt,key:r.key};
+}
+function watchHistory(w){                                        /* every step's value, and the steps where it changed */
+  w.vals=TRACE.steps.map(s=>watchAt(w,s)); w.mode=simple; w.ch=[]; w.lib={};
+  for(let i=1;i<w.vals.length;i++) if(w.vals[i].txt!==w.vals[i-1].txt){ w.ch.push(i);
+    const S=TRACE.steps[i], k=w.vals[i].key||w.vals[i-1].key, r=keyRange(S,k)||keyRange(TRACE.steps[i-1],k), lw=r&&libIn(S,r[0],r[1]-r[0]);
+    if(lw) w.lib[i]=lw.func; }                                     /* a gdb watchpoint saw a library call change it */
+}
+const WCH=()=>new Set(WATCH.flatMap(w=>w.ch||[]));
+function addWatch(fn,ex){
+  ex=(ex||"").trim(); if(!ex||!TRACE) return;
+  if(WATCH.some(w=>w.fn===fn&&w.ex===ex)) return;
+  const w={fn,ex}; watchHistory(w); WATCH.push(w); saveWatch();
+  WEX=""; $("wex").value=""; draw();
+}
+function renderWatch(){
+  const box=$("watch"); if(!TRACE){ box.hidden=true; return; }
+  box.hidden=false;
+  const fns=[...new Set(TRACE.steps.flatMap(s=>s.frames.map(f=>f.func)))];
+  const sel=$("wfn");
+  if(sel.dataset.fns!==fns.join(",")){ sel.dataset.fns=fns.join(",");                        /* this trace's functions */
+    sel.innerHTML=`<option value="">the running function</option>`+fns.map(f=>`<option value="${esc(f)}">${esc(f)}</option>`).join(""); sel.value=WFN; }
+  $("wnote").textContent=WATCH.length?"":"Pick a function and an expression, like head, *head, head->next or vals[2].";
+  const N=TRACE.steps.length;
+  $("wlist").innerHTML=WATCH.map((w,k)=>{
+    if(!w.vals||!w.lib||w.mode!==simple||w.vals.length!==N) watchHistory(w);
+    const v=w.vals[at], now=w.ch.includes(at), fc=w.fn?fcol(w.fn)[0]:MUT;
+    const vals=w.ch.filter(i=>!w.vals[i].off&&!w.vals[i-1].off).length;
+    const tick=i=>{ const x=(N>1?i/(N-1):0)*1000, off=w.vals[i].off||w.vals[i-1].off;
+      return `<rect data-go="${i}" x="${x-3}" y="3" width="6" height="12" rx="1.5" fill="${off?"#C8D2DE":AMB}"><title>step ${i+1}: ${esc(w.vals[i-1].txt)} → ${esc(w.vals[i].txt)}${w.lib[i]?` (inside ${esc(w.lib[i])}())`:""}</title></rect>`; };
+    const cx=(N>1?at/(N-1):0)*1000;
+    const hist=w.ch.slice(0,300).map(i=>{ const RA=ranAt(i);
+      return `<tr data-go="${i}"${i===at?' class="on"':""}><td>step ${i+1}</td><td>line ${RA?RA.line:TRACE.steps[i].line}</td><td>${esc(w.vals[i-1].txt)} → <b>${esc(w.vals[i].txt)}</b>${w.lib[i]?`<span class="wlib" title="a gdb watchpoint caught this write">inside ${esc(w.lib[i])}()</span>`:""}</td></tr>`; }).join("");
+    return `<div class="wr">`+
+      `<span class="wt"><span class="wk">W${k+1}</span><code>${esc(w.ex)}</code><span class="wf" style="color:${fc}">${w.fn?`in ${esc(w.fn)}`:"in the running function"}</span></span>`+
+      `<span class="wv${now?" now":""}${v.off?" off":""}${v.bad?" bad":""}">${esc(v.txt)}</span>`+
+      `<span class="wc">${vals} change${vals===1?"":"s"}</span>`+
+      `<span class="wb"><button data-wp="${k}" title="previous change">◀ change</button><button data-wn="${k}" title="next change">change ▶</button><button data-wx="${k}" title="stop watching">×</button></span>`+
+      `<svg class="wtl" viewBox="0 0 1000 18" preserveAspectRatio="none" data-tl="1"><rect x="0" y="8" width="1000" height="2" fill="#E2E8F0"/>${w.ch.map(tick).join("")}`+
+        `<rect x="${cx-1.5}" y="0" width="3" height="18" fill="${INK}"/></svg>`+
+      (hist?`<details${w.open?" open":""} data-k="${k}"><summary>history</summary><table>${hist}</table></details>`:"")+`</div>`;
+  }).join("");
+}
+function showWatchBadges(){                                      /* W1, W2 … on the boxes being watched */
+  const pic=$("pic"); if(!TRACE||!WATCH.length) return;
+  if(view==="cards"){
+    const svg=pic.querySelector("svg"); if(!svg) return; let g="";
+    WATCH.forEach((w,k)=>{ const v=w.vals&&w.vals[at]; if(!v||!v.key) return;
+      const el=svg.querySelector(`[data-box="${v.key}"]`); if(!el) return;
+      const bb=el.getBBox(), x=bb.x+bb.width-6-k*30, y=bb.y;
+      g+=`<rect x="${x-26}" y="${y-8}" width="26" height="15" rx="7.5" fill="${INK}"/><text x="${x-13}" y="${y+3}" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">W${k+1}</text>`; });
+    svg.insertAdjacentHTML("beforeend",`<g class="wbadges">${g}</g>`);
+  } else WATCH.forEach((w,k)=>{ const v=w.vals&&w.vals[at]; if(!v||!v.key) return;
+    const el=pic.querySelector(`[data-box~="${v.key}"]`);
+    if(el){ el.classList.add("watched"); el.dataset.w=(el.dataset.w?el.dataset.w+" ":"")+"W"+(k+1); } });
+}
+function watchJump(k,d){                                         /* to this watch's previous or next change */
+  const w=WATCH[k]; if(!w||!w.ch.length) return;
+  const i=d>0?w.ch.find(i=>i>at):[...w.ch].reverse().find(i=>i<at);
+  if(i!==undefined){ at=i; draw(); }
+}
+
+/* ---------- bugs: use after free, reading ??, double free, bad free, a crash ---------- */
+let BUGS=[], BONLY=false;
+function idsRead(code,fr){                                         /* variables whose value this line reads */
+  const toks=[...code.matchAll(/->|[A-Za-z_]\w*|\S/g)].map(m=>m[0]), out=new Set(), names=new Set(fr.vars.map(v=>v.name));
+  const KW=/^(return|if|while|for|else|sizeof|struct|int|char|long|short|unsigned|void|const|double|float)$/;
+  toks.forEach((t,k)=>{ if(!names.has(t)||KW.test(t)) return;
+    const prev=toks[k-1], next=toks[k+1];
+    if(prev==="->"||prev==="."||prev==="&"||next==="(") return;                         /* a field, an address, a call */
+    if(prev&&/^[A-Za-z_]\w*$/.test(prev)&&!names.has(prev)&&!KW.test(prev)&&prev!=="return") return;   /* a declaration */
+    if(prev==="*"&&toks[k-2]&&/^[A-Za-z_]\w*$/.test(toks[k-2])&&!names.has(toks[k-2])) return;
+    out.add(t); });
+  return [...out];
+}
+function freedWhen(addr,i){                                        /* the line and step where this block was freed */
+  for(let k=i;k>0;k--){ const b=TRACE.steps[k].heap.find(n=>n.addr===addr), p=TRACE.steps[k-1].heap.find(n=>n.addr===addr);
+    if(b&&b.freed&&(!p||!p.freed)){ const RA=ranAt(k); return {line:RA?RA.line:TRACE.steps[k-1].line,step:k+1}; } }
+  return null;
+}
+function markBugs(t){
+  BUGS=[];
+  t.steps.forEach((s,i)=>{
+    s.bugs=[];
+    const RA=i>0?ranAt(i):null;
+    (s.events||[]).forEach(ev=>{                                    /* what trace.py noticed */
+      const line=ev.kind==="signal"||ev.pending?s.line:(RA?RA.line:s.line);
+      s.bugs.push({kind:ev.kind==="signal"?"crash":ev.kind,line,addr:ev.addr,sig:ev.name,pending:!!ev.pending});
+    });
+    if(RA&&SRC&&RA.fr){
+      const P=t.steps[i-1], fr=RA.fr, code=codeAt(RA.line), raw=(SRC[RA.line-1]||"");
+      exprSpans(raw).forEach(([a,b])=>{ const ex=raw.slice(a,b);      /* 17: through a pointer to freed memory */
+        if(!/->|\*|\[/.test(ex)) return;
+        const res=evalExpr(P,fr,ex);
+        if(res.err&&res.errAddr!=null){ const after=raw.slice(b).trimStart();
+          s.bugs.push({kind:"use after free",line:RA.line,ex,addr:res.errAddr,write:/^=[^=]/.test(after)}); } });
+      idsRead(code,fr).forEach(name=>{                                 /* 19: a variable that isn't set yet */
+        const v=fr.vars.find(v=>v.name===name);
+        if(v&&v.init===false&&!writes(code,name)) s.bugs.push({kind:"not set yet",line:RA.line,name}); });
+    }
+    s.bugs.forEach(b=>BUGS.push({step:i,...b}));
+  });
+}
+function bugText(b,i){
+  if(b.kind==="use after free"){ const w=freedWhen(b.addr,i);
+    return `${b.write?"writes":"reads"} ${b.ex}, but that goes through freed block ${show(b.addr)}${w?`, freed on line ${w.line} (step ${w.step})`:""}`; }
+  if(b.kind==="not set yet") return `reads ${b.name} before it's set: its value is whatever bytes were left there`;
+  if(b.kind==="double free"){ const w=freedWhen(b.addr,i-1);
+    return `free(${show(b.addr)}) a second time${w?`: it was already freed on line ${w.line} (step ${w.step})`:""}`; }
+  if(b.kind==="bad free") return `free(${show(b.addr)}): that address never came from malloc`;
+  if(b.kind==="crash") return `the program was stopped by ${b.sig}${b.sig==="SIGABRT"?", because glibc caught a heap bug and aborted":b.sig==="SIGSEGV"?", because it touched memory it isn't allowed to":""}`;
+  return b.kind;
+}
+function bugHTML(s){                                               /* the red bar above the picture */
+  if(!s.bugs||!s.bugs.length) return "";
+  const k=BUGS.findIndex(b=>b.step===at);
+  return `<div class="bugbar" role="alert">${s.bugs.map(b=>`<div><b>${b.kind==="crash"?"Crash":"Bug"} on line ${b.line}</b>: ${esc(bugText(b,at))}${b.pending?" (the program stopped inside this line)":""}</div>`).join("")}`+
+    `<span class="bn">${k+1} of ${BUGS.length} <button data-bug="-1" title="previous bug">◀</button><button data-bug="1" title="next bug">▶</button></span></div>`;
+}
+function bugJump(d){ if(!BUGS.length) return; const steps=[...new Set(BUGS.map(b=>b.step))];
+  const i=d>0?steps.find(k=>k>at):[...steps].reverse().find(k=>k<at);
+  at=i!==undefined?i:(d>0?steps[0]:steps[steps.length-1]); draw(); }
+
+/* ---------- 27: the line that just ran, in plain words ---------- */
+let WORDS=true;
+const kc=t=>`<code>${esc(t)}</code>`;                                /* a bit of code inside a sentence */
+function boxIn(st,key){                                            /* find a box on one step: a variable, a field, a node */
+  const [k,a,f]=key.split(":"), addr=+a;
+  if(k==="v"){ for(const fr of st.frames){ const v=fr.vars.find(v=>v.addr===addr); if(v) return {v,fr}; } return null; }
+  const n=st.heap.find(n=>n.addr===addr); if(!n) return null;
+  return k==="b"?{n}:{n,fd:(n.fields||[]).find(x=>x.name===f)};
+}
+function boxName(st,key,runFn){
+  const b=boxIn(st,key); if(!b) return "that box";
+  if(b.v) return b.fr.func===runFn?b.v.name:`${b.fr.func}'s ${b.v.name}`;
+  return b.fd?`${show(b.n.addr)}'s ${b.fd.name}`:`the node at ${show(b.n.addr)}`;
+}
+function boxVal(st,key){
+  const b=boxIn(st,key); if(!b) return "?";
+  const u=b.v||b.fd; if(!u) return `the node at ${show(b.n.addr)}`;
+  if(u.init===false) return "?? (not set yet)";
+  if(u.kind==="ptr") return u.value?show(u.value):"NULL";
+  if(u.kind==="int") return String(u.value);
+  return (b.v?arrText(u.type,u.size,u.bytes,30):null)||"—";
+}
+function blockEnd(line){                                           /* the line of the } that closes the block opened on this line */
+  let depth=0, seen=false;
+  for(let l=line;l<=SRC.length;l++){ const c=codeAt(l);
+    for(const ch of c){ if(ch==="{"){ depth++; seen=true; } else if(ch==="}"){ depth--; if(seen&&depth===0) return l; } }
+    if(!seen&&l>line) return line+1;                                /* no braces: the body is the next line */
+  }
+  return SRC.length;
+}
+function chainWords(st,fr,ex){                                     /* "current points to 0x200; 0x200's next is 0x300" */
+  const res=evalExpr(st,fr,ex); if(res.err||!res.hops.length) return null;
+  const parts=[];
+  res.hops.forEach(h=>{ const nm=boxName(st,h.box,fr.func), val=boxVal(st,h.box);
+    if(!parts.some(p=>p.nm===nm)) parts.push({nm,val}); });
+  return parts.map(p=>`${kc(p.nm)} is ${kc(p.val)}`).join(", ");
+}
+function lineWords(i){
+  const RA=ranAt(i); if(!RA||!SRC||!RA.fr) return null;
+  const P=TRACE.steps[i-1], S=TRACE.steps[i], fr=RA.fr, fn=fr.func, raw=(SRC[RA.line-1]||"").trim(), code=codeAt(RA.line).trim();
+  const out=[], say=t=>out.push(t);
+  /* a function just finished: its value came back into this line */
+  if(RA.ret){ const R=retInfo(S), gone=P.frames[0].func;
+    if(R) say(`${kc(gone)} finished and returned ${kc(R.txt)}${R.recv?`, which is now in ${kc(R.recv.name)}`:", but nothing stores it"}.`);
+    else say(`${kc(gone)} finished. Back in ${kc(fn)}.`); }
+  /* a call: which values the new function's parameters got */
+  else if(RA.call){ const callee=S.frames[0], CI=callInfo(S);
+    say(`Calls ${kc(callee.func)}. It starts at line ${S.line}.`);
+    callee.vars.filter(v=>v.arg).forEach(v=>{ const ci=CI["v:"+v.addr];
+      say(`${kc(v.name)} gets ${kc(boxVal(S,"v:"+v.addr))}${ci?`: it ${esc(ci.text)}`:""}.`); }); }
+  /* if / while / for: what was checked, and which way it went */
+  else if(/^(if|while|for)\b/.test(code)||/^}?\s*else\s+if\b/.test(code)){
+    const kw=code.match(/\b(if|while|for)\b/)[1], end=blockEnd(RA.line), inside=S.line>RA.line&&S.line<=end;
+    const open=code.indexOf("("), cond=kw==="for"?(code.split(";")[1]||"").trim():code.slice(open+1,code.lastIndexOf(")")).trim();
+    const vals=exprSpans(cond).map(([a,b])=>cond.slice(a,b)).filter((x,k,arr)=>arr.indexOf(x)===k)
+      .map(ex=>{ const sf=S.frames.find(f=>f.func===fn), r=evalExpr(sf?S:P,sf||fr,ex); return r.err?null:`${kc(ex)} is ${kc(boxValOf(r.r))}`; })
+      .filter(Boolean);
+    if(kw==="for"){ const named=new Set(code.match(/[A-Za-z_]\w*/g)||[]);                  /* the loop variable, as the for line set it */
+      const ch=[...touched(i).ch].filter(k=>k.startsWith("v:")).filter(k=>{ const b=boxIn(S,k); return b&&b.v&&b.v.init!==false&&named.has(b.v.name); })
+        .map(k=>`${kc(boxName(S,k,fn))} is now ${kc(boxVal(S,k))}`); if(ch.length) say(ch.join(", ")+"."); }
+    say(`Checks ${kc(cond||"the condition")}${vals.length?`: ${vals.join(", ")}`:""}.`);
+    if(kw==="if") say(inside?`That's true, so line ${S.line} runs next.`:/else/.test(codeAt(end)+codeAt(end+1))?`That's false, so the else part runs.`:`That's false, so it skips to line ${S.line}.`);
+    else say(inside?`That's true, so the loop body runs (line ${S.line}).`:`That's false, so the loop ends. Next is line ${S.line}.`); }
+  /* free(x) */
+  else if(/^free\s*\(/.test(code)){ const arg=code.slice(code.indexOf("(")+1,code.lastIndexOf(")")).trim(), r=evalExpr(P,fr,arg), a=r.r&&r.r.value;
+    say(`Gives the block at ${kc(a?show(a):"?")} back to malloc.`);
+    say(`${kc(arg)} still holds ${kc(a?show(a):"?")}, but that block isn't yours any more: using it now is a bug.`); }
+  /* printf and friends */
+  else if(/^(printf|puts|putchar|fprintf)\s*\(/.test(code)){ const o=(S.out||"").slice((P.out||"").length);
+    say(o?`Prints ${kc('"'+o.replace(/\n/g,"\\n")+'"')}.`:`Calls ${kc(code.split("(")[0])}, but nothing new appeared in the output yet.`); }
+  /* return x; */
+  else if(/^return\b/.test(code)){ const ex=code.replace(/^return\s*/,"").replace(/;$/,"").trim();
+    if(ex){ const r=evalExpr(P,fr,ex); say(`Returns ${kc(ex)}, which is ${kc(r.r?boxValOf(r.r):"?")}, to ${kc(P.frames[1]?P.frames[1].func:"the caller")}.`); }
+    else say(`Returns to ${kc(P.frames[1]?P.frames[1].func:"the caller")}.`); }
+  /* x = …;  x->y = …;  int x = …;  x++; */
+  else { const m=code.match(/^(.*?[^=!<>+\-*\/%&|^])(\+=|-=|\*=|\/=|=)(?!=)(.*?);?$/), inc=code.match(/^(.+?)(\+\+|--);$|^(\+\+|--)(.+?);$/);
+    if(m){ let lhs=m[1].trim(); const op=m[2], rhs=m[3].trim().replace(/;$/,"");
+      const decl=lhs.match(/^(?:const\s+)?(?:struct\s+\w+|unsigned\s+\w+|\w+)\s*(\**)\s*([A-Za-z_]\w*)(\s*\[\d*\])?$/);
+      if(decl&&!/->|\./.test(lhs)&&decl[2]&&fr.vars.some(v=>v.name===decl[2])) lhs=decl[2];
+      const L=evalExpr(P,fr,lhs);
+      if(L.err){ say(`Sets ${kc(lhs)}.`); }
+      else { const key=L.r.key, name=boxName(S,key,fn), before=boxVal(P,key), after=boxVal(S,key);
+        if(/\b(malloc|calloc|realloc)\s*\(/.test(rhs)){ const b=S.heap.find(n=>n.addr===(boxIn(S,key)||{}).v?.value);
+          say(`Asks malloc for memory. It gives a new ${b&&b.size?b.size+"-byte ":""}block at ${kc(after)}.`); }
+        else if(!/[A-Za-z_]\w*\s*\(/.test(rhs)){ const cw=chainWords(P,fr,rhs); if(cw&&/->|\*|\[/.test(rhs)) say(`Follows ${kc(rhs)}: ${cw}.`); }   /* not a function call */
+        const through=L.hops.filter(h=>h.from).length&&L.hops[L.hops.length-1].box.startsWith("v:");     /* *head = … writes into someone else's box */
+        if(through) say(`${kc(lhs.replace(/^\*+/,""))} holds the address of ${kc(name)}, so the write goes into ${kc(name)}.`);
+        say(op==="="?`Writes ${kc(after)} into ${kc(name)}${before===after?" (no change)":/^\?\?/.test(before)?" (it wasn't set before)":` (it was ${kc(before)})`}.`:`${kc(name)} goes from ${kc(before)} to ${kc(after)}.`);
+        const bx=boxIn(P,key);
+        if(bx&&bx.v&&bx.v.arg&&bx.fr===P.frames[0]&&P.frames[1]){                                   /* a parameter: only this copy changes */
+          const orig=P.frames[1].vars.find(v=>v.kind===bx.v.kind&&v.value===bx.v.value&&v.name===bx.v.name);
+          if(orig&&before!==after) say(`That changes only ${kc(fn)}'s own copy: ${kc(P.frames[1].func+"'s "+orig.name)} still holds ${kc(before)}.`); } } }
+    else if(inc){ const nm=(inc[1]||inc[4]).trim(), L=evalExpr(P,fr,nm);
+      if(!L.err) say(`${kc(boxName(S,L.r.key,fn))} goes from ${kc(boxVal(P,L.r.key))} to ${kc(boxVal(S,L.r.key))}.`); }
+    else if(/^}/.test(code)) say(`Goes to line ${S.line}.`);
+    else { const ch=[...touched(i).ch].filter(k=>k.startsWith("v:")||/^h:\d+:/.test(k));
+      if(ch.length) say(ch.slice(0,4).map(k=>`${kc(boxName(S,k,fn))} is now ${kc(boxVal(S,k))}`).join(", ")+"."); } }
+  /* what a library call did inside, as gdb's watchpoints saw it */
+  libWords(i).forEach(say);
+  /* what it left behind */
+  const Rp=reachAt(i-1), Rs=reachAt(i);
+  S.heap.forEach(n=>{ if(!n.freed&&Rp.has(n.addr)&&!Rs.has(n.addr)) say(`Nothing points to ${kc(show(n.addr))} any more: it's leaked.`); });
+  return out.length?{line:RA.line,code:raw,out}:null;
+}
+function boxValOf(r){ return r.kind==="node"?`the node at ${show(r.node.addr)}`:r.kind==="elem"?r.txt:r.init===false?"??":r.kind==="ptr"?(r.value?show(r.value):"NULL"):r.kind==="int"?String(r.value):"—"; }
+function wordsHTML(){
+  if(!WORDS||!TRACE||at===0) return "";
+  let w=null; try{ w=lineWords(at); }catch(e){ console.error(e); }
+  if(!w) return "";
+  return `<div class="words"><div class="wl">Line ${w.line} <code>${esc(w.code)}</code></div><ul>${w.out.map(t=>`<li>${t}</li>`).join("")}</ul></div>`;
+}
+
+/* ---------- node cards view ---------- */
+function renderCards(s){
+  const TT=touched(at), CH=TT.ch, R=reachable(s), inner=s.frames[0], RC=reach(s), CI=callInfo(s), RET=retInfo(s);
+  const LL=listLines(s), SLOTW=184, SLOTH=86, HY=276+18*LL.length, CW=218, STEP=236, FH=36, DIM=' opacity="0.22"';
+  const HOPC=["#BFDBFE","#93C5FD","#3B82F6","#1D4ED8"], hopc=d=>HOPC[Math.min(d,3)];          /* own, 1, 2, 3+ hops away */
+  const EX=e=>` data-ex="${esc(e)}"`;                                                        /* hover it: its hops light up */
+  const isNew=f=>at>0&&f===inner&&TRACE.steps[at-1].frames.length<s.frames.length;
+  let o="", arrows="", labels="", pos={}, fpos={}, x=16, y=34;
+  o+=`<text x="16" y="21" font-size="15" font-weight="600" fill="${INK}">Stack<tspan dx="10" font-size="11.5" font-weight="400" fill="${MUT}">faded = not touched by this line</tspan></text>`;
+  [...s.frames].reverse().forEach(f=>{                           /* address order: main's frame on the left */
+    const vars=[...f.vars].sort((a,b)=>(b.addr||0)-(a.addr||0));
+    let slots=vars.map(v=>({v,addr:v.addr||0,w:SLOTW}));
+    if(FRAMEINT&&f.rbp&&f.frame_bytes){                            /* the rest of the frame: return address, saved rbp, unused slots */
+      const fb=hx(f.frame_bytes), lo=f.lo??f.rsp, hi=f.rbp+16, cover=new Set();
+      vars.forEach(v=>{ if(v.addr) for(let a=v.addr;a<v.addr+(v.size||8);a++) cover.add(a); });
+      for(let a=hi-8;a>=lo;a-=8){
+        if([0,1,2,3,4,5,6,7].some(i=>cover.has(a+i))||a-lo+8>fb.length) continue;
+        const ss=sysSlot(f,a,fb,lo);
+        slots.push({e:{sys:ss.name,tip:ss.tip,addr:a,val:le(fb.slice(a-lo,a-lo+8))},addr:a,w:ss.name==="not used"?66:120});
+      }
+      slots.sort((x,y)=>y.addr-x.addr);
+    }
+    const w=28+slots.reduce((t,s)=>t+s.w+8,0)-8, SP=FRAMEINT&&f.rbp&&f.rsp?f:null, spMarks=[];
+    fpos[f.func]={x,w};
+    const [fc,ft]=fcol(f.func);
+    o+=`<rect x="${x}" y="${y}" width="${w}" height="${SLOTH+34}" rx="10" fill="${ft}" stroke="${isNew(f)?AMB:LN}" stroke-width="${isNew(f)?1.6:1}"/>`+
+       `<rect x="${x}" y="${y}" width="5" height="${SLOTH+34}" rx="2.5" fill="${fc}"/>`+                /* the function's colour */
+       `<text x="${x+16}" y="${y+18}" font-size="12.5" font-weight="600" fill="${fc}">${esc(f.func)}'s frame`+
+       (()=>{ const room=Math.floor((w-24-(f.func.length+8)*7)/5.7), sg=f.sig||"";           /* the function's signature, if it fits */
+         return sg&&room>12?`<tspan dx="10" font-size="10.5" font-weight="400" fill="${MUT}" ${MONO}>${esc(sg.length>room?sg.slice(0,room-1)+"…":sg)}</tspan>`:""; })()+`</text>`;
+    let sx=x+14;
+    slots.forEach(sl=>{
+      const bx=sx, by=y+24; sx+=sl.w+8;
+      if(SP){ const a0=sl.addr, a1=sl.addr+(sl.v?(sl.v.size||8):8);                   /* where rsp and rbp point, and what's below rsp */
+        const m=[]; if(SP.rbp>=a0&&SP.rbp<a1) m.push("rbp"); if(SP.rsp>=a0&&SP.rsp<a1) m.push("rsp");
+        spMarks.push({bx,w:sl.w,by,m:m.length===2?["rsp = rbp"]:m,rz:a1<=SP.rsp}); }
+      if(sl.e){                                                    /* not a variable of yours */
+        const e=sl.e, val=e.sys==="not used"?"":e.sys==="stack canary"?"0x"+e.val.toString(16):show(num(e.val));
+        o+=`<g data-tip="${esc(e.tip+"\nreal address "+real(e.addr)+"\nvalue 0x"+e.val.toString(16))}">`+
+          `<rect x="${bx}" y="${by}" width="${sl.w}" height="${SLOTH}" rx="8" fill="#EBEEF1" stroke="none"/>`+
+          `<text x="${bx+9}" y="${by+17}" font-size="11" font-weight="600" fill="${MUT}">${e.sys}</text>`+
+          (val?`<text x="${bx+9}" y="${by+40}" font-size="${val.length>10?10:12}" font-weight="700" fill="${MUT}" ${MONO}>${esc(val)}</text>`:"")+
+          `<text x="${bx+9}" y="${by+58}" font-size="10" fill="${FAINT}" ${MONO}>at ${show(e.addr)}</text></g>`;
+        return;
+      }
+      const v=sl.v, SLOTW2=sl.w, key="v:"+v.addr, C=CH.has(key), I=!C&&TT.inv.has(key), F=TT.on&&!C&&!I, rc=RC[key], ci=CI[key], hd=RC._D?RC._D[key]:undefined, out=hd===undefined&&!!inner;
+      const role=`\n${v.arg?"parameter":"local"} of ${f.func}${v.decl?`, declared on line ${v.decl}`:""}`+(ci?`\n${ci.text}`:"")+(out?`\n${inner.func} can't reach this box`:"")+(v.addr?libTip(s,v.addr,v.size||8):"");
+      const val=v.init===false?"??":v.kind==="int"?String(v.value):v.kind==="other"?(arrText(v.type,v.size,v.bytes,22)||"—"):(v.value===null?"—":show(v.value));   /* ?? only means: not set yet */
+      pos[key]={x:bx+SLOTW2/2,y:by+SLOTH,C,I,F,who:(f===inner?"":f.func+"'s ")+v.name};
+      o+=`<g data-box="${key}" data-lad="${v.addr}|${esc(f.func)}|${esc(v.name)}" data-tip="${esc(v.name+" ("+v.type+")"+role+"\nreal address "+real(v.addr)+"\nvalue "+(v.value===null?"??":real(v.value))+(v.init===false?"\nnot set yet: leftover bytes":"")+reachTip(rc,inner.func))}"${F?DIM:""}>`+
+        `<rect x="${bx}" y="${by}" width="${SLOTW2}" height="${SLOTH}" rx="8" fill="${C?AMBG:out?"#F1F3F5":"#fff"}" stroke="${C?AMB:I?INK:BORDER}" stroke-width="${C||I?2.2:1}"/>`+
+        (hd!==undefined?`<rect x="${bx+2}" y="${by+7}" width="4" height="${SLOTH-14}" rx="2" fill="${hopc(hd)}"/>`:"")+
+        `<text x="${bx+11}" y="${by+17}" font-size="12.5" font-weight="700" fill="${INK}" ${MONO}>${esc(v.name)}</text>`+
+        (v.name.length>7?"":`<text x="${bx+SLOTW2-8}" y="${by+17}" font-size="10" text-anchor="end" fill="${MUT}">${esc(v.type)}</text>`)+
+        `<text x="${bx+11}" y="${by+40}" font-size="${val.length>10?12:15}" font-weight="800" fill="${C?AMB:INK}" ${MONO}>${C?`<tspan class="pop">${esc(val)}</tspan>`:esc(val)}</text>`+
+        (rc?`<text x="${bx+SLOTW2-8}" y="${by+40}" font-size="11" font-weight="700" text-anchor="end" fill="${REACH}" ${MONO}${EX(rc.v)}>= ${esc(orText(rc.v,rc.alt.map(o=>o.v),12))}</text>`:"")+
+        `<text x="${bx+11}" y="${by+58}" font-size="10" fill="${MUT}" ${MONO}>at ${show(v.addr)}</text>`+
+        (rc?`<text x="${bx+SLOTW2-8}" y="${by+58}" font-size="10" font-weight="700" text-anchor="end" fill="${REACH}" ${MONO}${EX(rc.a)}>= ${esc(orText(rc.a,rc.alt.map(o=>o.a),13))}</text>`:"")+
+        (ci?`<text x="${bx+11}" y="${by+76}" font-size="10" font-weight="700" fill="${AMB}" ${MONO}>${esc(ci.text)}</text>`                     /* the call: where this came from */
+           :out?`<text x="${bx+11}" y="${by+76}" font-size="10" font-style="italic" fill="${MUT}">not reachable from here</text>`
+           :(rc?`<text x="${bx+11}" y="${by+76}" font-size="10" fill="${MUT}" ${MONO}${EX(rc.v)}>change: <tspan fill="${REACH}" font-weight="700">${esc(rc.v)} = …;</tspan></text>`:"")+
+            (v.decl?`<text x="${bx+SLOTW2-8}" y="${by+76}" font-size="10" text-anchor="end" fill="${MUT}" ${MONO}>line ${v.decl}</text>`:""))+`</g>`;
+    });
+    if(SP){                                                        /* pills under the slots, and a bracket under the red zone */
+      spMarks.forEach(k=>k.m.forEach(t=>{ const pw=t.length*6.4+12;
+        o+=`<g data-tip="${esc(t==="rbp"?"rbp, the frame pointer: saved rbp is here, and this function's locals sit below it":t==="rsp"?"rsp, the stack pointer: the lowest address this frame uses. A call pushes below it":"rsp and rbp point to the same place: this function calls nothing, so it never moved rsp and keeps its locals below it (the red zone)")}">`+
+          `<rect x="${k.bx+6}" y="${k.by+SLOTH-3}" width="${pw}" height="13" rx="6.5" fill="${INK}"/><text x="${k.bx+6+pw/2}" y="${k.by+SLOTH+7}" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">${t}</text></g>`; }));
+      const rz=spMarks.filter(k=>k.rz);
+      if(rz.length){ const x0=Math.min(...rz.map(k=>k.bx)), x1=Math.max(...rz.map(k=>k.bx+k.w)), yb=rz[0].by+SLOTH+4;
+        o+=`<g data-tip="the red zone: below rsp. A function that calls nothing may keep its locals here without moving rsp"><path d="M${x0},${yb-3} V${yb} H${x1} V${yb-3}" fill="none" stroke="${FAINT}" stroke-width="1.2" stroke-dasharray="3 3"/>`+
+          `<rect x="${x1-104}" y="${yb-2}" width="98" height="13" rx="6.5" fill="#fff" stroke="${FAINT}" stroke-dasharray="3 2"/><text x="${x1-55}" y="${yb+8}" font-size="10" font-weight="600" text-anchor="middle" fill="${MUT}">red zone: below rsp</text></g>`; }   /* at the right end, clear of pointer arrows */
+    }
+    x+=w+14;
+  });
+  /* heap cards, in address order */
+  const own=new Set(s.heap.map(n=>n.addr));
+  const hid=FOLD?s.heap.filter(n=>n.freed||!R.has(n.addr)):[], hset=new Set(hid.map(n=>n.addr));
+  const blocks=s.heap.filter(n=>!hset.has(n.addr)), ordered=LORDER?heapOrder(s,blocks):blocks;
+  const items=[...ordered.map(n=>({n,a:n.addr})),...(s.chunks||[]).filter(c=>!own.has(c.addr)).map(c=>({c,a:c.addr}))];
+  if(!LORDER) items.sort((p,q)=>p.a-q.a);
+  if(hid.length) items.push({hid});
+  const W=Math.max(980, x+2, 60+items.length*STEP);
+  const nf=Math.max(1,...s.heap.map(n=>(n.fields||[]).length)), CARDH=46+nf*FH;
+  const sizes=[...new Set(s.heap.map(n=>n.size).filter(Boolean))];
+  LL.forEach((l,k)=>{ o+=`<text x="16" y="${HY-30-18*(LL.length-k)}" font-size="12" fill="${l.bad?BAD:INK}" ${MONO} paint-order="stroke" stroke="#fff" stroke-width="4"><tspan font-weight="700">${esc(l.names)}:</tspan> ${esc(l.text)} ${l.count?`<tspan fill="${MUT}">(${l.count} node${l.count===1?"":"s"})</tspan>`:""}</text>`; });   /* list lines */
+  const heapNote=`${sizes.length===1?sizes[0]+"-byte blocks":"blocks"}, ${LORDER?"in list order":"in address order (list order is set by next)"}`;
+  o+=`<text x="16" y="${HY-30}" font-size="15" font-weight="600" fill="${INK}">Heap<tspan dx="10" font-size="11.5" font-weight="400" fill="${MUT}">${heapNote}</tspan></text>`;
+  if(inner){
+    o+=`<text x="300" y="21" font-size="11.5" font-weight="700" fill="${REACH}">Blue shows how ${esc(inner.func)} gets there. Hover it to follow it.</text>`;   /* next to the title, so it's always in view */
+    const lx=16+46+Math.round(heapNote.length*6.3)+40;                                           /* hop colour legend, right after the heap title */
+    o+=`<text x="${lx}" y="${HY-30}" font-size="10.5" fill="${MUT}">Hops away</text>`+
+       ["own","1","2","3+"].map((t,i)=>`<rect x="${lx+64+i*36}" y="${HY-39}" width="9" height="11" rx="2" fill="${HOPC[i]}"/><text x="${lx+76+i*36}" y="${HY-30}" font-size="10.5" fill="${MUT}">${t}</text>`).join("");
+  }
+  const cx={};
+  items.forEach((it,k)=>{
+    const bx=16+k*STEP;
+    if(it.hid){                                                   /* folded away */
+      const fr=it.hid.filter(n=>n.freed).length, lk=it.hid.length-fr, my=HY+CARDH/2;
+      o+=`<g data-tip="switch off &quot;hide freed&quot; to see them"><rect x="${bx}" y="${HY}" width="${CW}" height="${CARDH}" rx="10" fill="${PNL}" stroke="${LN}" stroke-width="1.2" stroke-dasharray="5 4"/>`+
+        `<text x="${bx+CW/2}" y="${my}" font-size="12.5" font-weight="700" text-anchor="middle" fill="${MUT}">${it.hid.length} block${it.hid.length===1?"":"s"} hidden</text>`+
+        `<text x="${bx+CW/2}" y="${my+18}" font-size="10.5" text-anchor="middle" fill="${MUT}">${fr} freed, ${lk} leaked</text></g>`;
+      return;
+    }
+    if(it.c){                                                     /* a chunk that isn't one of your structs */
+      const c=it.c, top=c.state==="top", [title,sub]=chunkText(c), sz=top?c.size:c.size-16, my=HY+CARDH/2;
+      o+=`<g data-tip="${esc("chunk at "+real(c.addr-16)+", 0x"+c.size.toString(16)+" bytes with its header")}"${TT.on?DIM:""}>`+
+        `<rect x="${bx}" y="${HY}" width="${CW}" height="${CARDH}" rx="10" fill="${top?"#fff":PNL}" stroke="${LN}" stroke-width="1.2"${top||c.state==="freed"?' stroke-dasharray="5 4"':""}/>`+
+        `<text x="${bx+10}" y="${HY+17}" font-size="11.5" font-weight="700" fill="${MUT}" ${MONO}>${simple?"":real(c.addr)}</text>`+
+        `<text x="${bx+CW/2}" y="${my}" font-size="12.5" font-weight="700" text-anchor="middle" fill="${MUT}">${title}</text>`+
+        `<text x="${bx+CW/2}" y="${my+16}" font-size="10.5" text-anchor="middle" fill="${MUT}" ${MONO}>0x${sz.toString(16)} bytes</text>`+
+        (sub?`<text x="${bx+CW/2}" y="${my+31}" font-size="10" text-anchor="middle" fill="${MUT}">${sub}</text>`:"")+`</g>`;
+      return;
+    }
+    const n=it.n, freed=!!n.freed, lost=!freed&&!R.has(n.addr), rb=RC["b:"+n.addr], hd=RC._D?RC._D["b:"+n.addr]:undefined, out=hd===undefined&&!freed&&!lost&&!!inner;
+    const C=freed?CH.has("h:"+n.addr+":freed"):n.fields.some(f=>CH.has("h:"+n.addr+":"+f.name)), I=!C&&TT.inv.has("b:"+n.addr), F=TT.on&&!C&&!I;
+    cx[n.addr]=bx;
+    const cStroke=C?AMB:freed?DEAD:lost?BAD:I?INK:BORDER, band=freed?"#EDF1F5":lost?"#FBE9E9":C?"#FCEBC2":"#EEF2F7", at=show(n.addr), tw=at.length*7.4+18;
+    o+=`<g data-box="b:${n.addr}" data-tip="${esc("real address "+real(n.addr)+"\n"+n.type+reachTip(rb,inner?inner.func:"")+(out?`\n${inner.func} can't reach this block`:"")+libTip(s,n.addr,n.size||16))}"${F?DIM:""}>`+
+      (freed||lost?"":`<rect x="${bx+4}" y="${HY+4}" width="${CW}" height="${CARDH}" rx="10" fill="#DCE4EE"/>`)+                        /* a card lying on the paper */
+      `<path d="M${bx+8},${HY+2} V${HY-11} Q${bx+8},${HY-17} ${bx+14},${HY-17} H${bx+8+tw-6} Q${bx+8+tw},${HY-17} ${bx+8+tw},${HY-11} V${HY+2} Z" fill="${band}" stroke="${cStroke}" stroke-width="${C||I?2:1}" ${(lost||freed)?'stroke-dasharray="4 3"':""}/>`+
+      `<rect x="${bx}" y="${HY}" width="${CW}" height="${CARDH}" rx="10" fill="${freed?PNL:lost?"#FEF6F6":out?"#F3F5F8":"#fff"}" stroke="${cStroke}" stroke-width="${C||I?2.2:1}" ${(lost||freed)?'stroke-dasharray="5 4"':""}/>`+
+      `<path d="M${bx+1},${HY+42} V${HY+10} Q${bx+1},${HY+1} ${bx+10},${HY+1} H${bx+CW-10} Q${bx+CW-1},${HY+1} ${bx+CW-1},${HY+10} V${HY+42} Z" fill="${band}"/>`+
+      `<text x="${bx+8+tw/2}" y="${HY-4}" font-size="11" font-weight="700" text-anchor="middle" fill="${freed?MUT:INK}" ${MONO}>${at}</text>`+
+      (hd!==undefined?`<rect x="${bx+2}" y="${HY+7}" width="4" height="${CARDH-14}" rx="2" fill="${hopc(hd)}"/>`:"")+
+      (rb?`<text x="${bx+11}" y="${HY+17}" font-size="10.5" font-weight="600" fill="${REACH}" ${MONO}${EX(rb.a)}>address = ${esc(orText(rb.a,rb.alt.map(o=>o.a),11))}</text>`:"")+
+      (rb?`<text x="${bx+11}" y="${HY+34}" font-size="10.5" font-weight="700" fill="${REACH}" ${MONO}${EX(rb.v)}>${esc(orText(rb.v,rb.alt.map(o=>o.v),22))}</text>`
+         :out?`<text x="${bx+11}" y="${HY+34}" font-size="10" font-style="italic" fill="${MUT}">not reachable from here</text>`:"")+
+      `<text x="${bx+CW-10}" y="${HY+17}" font-size="10" text-anchor="end" fill="${MUT}" ${MONO}>${esc(short(n.type))}</text>`+
+      `<line x1="${bx}" y1="${HY+42}" x2="${bx+CW}" y2="${HY+42}" stroke="${LN}"/>`;
+    if(freed) o+=`<text x="${bx+CW/2}" y="${HY+42+26}" font-size="12.5" font-weight="700" text-anchor="middle" fill="${MUT}">freed</text><text x="${bx+CW/2}" y="${HY+42+44}" font-size="10" text-anchor="middle" fill="${MUT}">back with the allocator</text>`;
+    (freed?[]:n.fields).forEach((fd,j)=>{
+      const fy=HY+42+j*FH, key="h:"+n.addr+":"+fd.name, Cf=CH.has(key), rf=RC[key];
+      const txt=fd.kind==="ptr"?show(fd.value):fd.kind==="other"?(arrText(fd.type,fd.size,fieldHex(n,fd),14)||"—"):(fd.value===null?"—":String(fd.value));
+      const fa=fd.offset!=null?n.addr+fd.offset:null, faTxt=fa===null?"":simple?show(fa):"…"+fa.toString(16).slice(-4);   /* this field's own address */
+      o+=`<g data-box="${key}" data-tip="${esc(fd.name+" ("+fd.type+")"+(fa===null?"":"\nat "+real(fa)+(simple?" ("+show(fa)+")":"")+", the block's start + "+fd.offset)+reachTip(rf,inner?inner.func:""))}">`+
+         `<rect x="${bx+3}" y="${fy+3}" width="${CW-6}" height="${FH-6}" rx="4" fill="${Cf?AMBG:"none"}"/>`+
+         `<text x="${bx+11}" y="${fy+17}" font-size="10.5" font-weight="${rf?700:400}" fill="${rf?REACH:MUT}" ${MONO}${rf?EX(rf.v):""}>${esc(rf?orText(rf.v,rf.alt.map(o=>o.v),16):fd.name)}</text>`+
+         `<text x="${bx+CW-10}" y="${fy+17}" font-size="${txt.length>7?12:14}" font-weight="800" text-anchor="end" fill="${Cf?AMB:INK}" ${MONO}>${Cf?`<tspan class="pop">${esc(txt)}</tspan>`:esc(txt)}</text>`+
+         (rf?`<text x="${bx+11}" y="${fy+30}" font-size="10" fill="${MUT}" ${MONO}${EX(rf.v)}>change: <tspan fill="${REACH}">${esc(rf.v)} = …;</tspan></text>`:"")+
+         (faTxt&&(!rf||rf.v.length<=17)?`<text x="${bx+CW-10}" y="${fy+30}" font-size="10" text-anchor="end" fill="${FAINT}" ${MONO}>at ${faTxt}</text>`:"")+`</g>`;
+    });
+    const lw=libIn(s,n.addr,n.size||16);                          /* a library call wrote into it on this line */
+    o+=(lost?`<text x="${bx+CW/2}" y="${HY+CARDH+14}" font-size="10" font-weight="700" text-anchor="middle" fill="${BAD}">unreachable — leaked</text>`:"")+
+      (lw?`<text x="${bx+CW/2}" y="${HY+CARDH+(lost?28:14)}" font-size="10" font-weight="700" text-anchor="middle" fill="${INK}" data-tip="${esc(`a gdb watchpoint caught ${lw.func}() writing ${lw.n} byte${lw.n===1?"":"s"} into this block, inside the library`)}">${esc(lw.func)}() wrote ${lw.n} byte${lw.n===1?"":"s"} here</text>`:"")+`</g>`;
+  });
+  const label=(tx,x0,y0,col)=>{ const hw=tx.length*3.3+5, lx=Math.max(16+hw,Math.min(W-16-hw,x0));
+    return `<rect x="${lx-hw}" y="${y0-12}" width="${2*hw}" height="16" rx="5" fill="#fff" opacity="0.94"/>`+
+      `<text x="${lx}" y="${y0}" font-size="11" font-weight="700" text-anchor="middle" fill="${col}">${esc(tx)}</text>`; };
+  const typeTag=(tx,x0,y0,col,F)=>`<text x="${x0}" y="${y0}" font-size="10" font-weight="700" fill="${col}" ${MONO}${F?DIM:""}>${esc(short(tx))}</text>`;
+  const star=(key,x0,y0,anchor,F)=>{ const r=RC[key]; if(!r) return "";                    /* what you get by following this arrow */
+    const w=r.v.length*6.2+6, lx=anchor==="end"?x0-w:x0;
+    return `<g${F?DIM:""}><rect x="${lx}" y="${y0-11}" width="${w}" height="14" rx="3" fill="#fff" opacity="0.9"/>`+
+      `<text x="${anchor==="end"?x0-3:x0+3}" y="${y0}" font-size="10" font-weight="700" text-anchor="${anchor}" fill="${REACH}" ${MONO}${EX(r.v)}>${esc(r.v)}</text></g>`; };
+  let low=HY+CARDH+90, lastLy=-1e9, ghosts="";
+  /* next links, curving under the cards */
+  s.heap.forEach(n=>{
+    (n.fields||[]).forEach((fd,j)=>{
+      if(n.freed||fd.kind!=="ptr"||!fd.value||cx[n.addr]===undefined||cx[fd.value]===undefined) return;   /* the card may be folded away */
+      const key="h:"+n.addr+":"+fd.name, C=CH.has(key), I=!C&&TT.inv.has(key), F=TT.on&&!C&&!I, col=C?AMB:I?INK:MUT;
+      const x1=cx[n.addr]+CW-20, x2=cx[fd.value]+20, by=HY+CARDH;
+      const d=20+Math.abs(cx[fd.value]-cx[n.addr])/STEP*12+j*10;
+      arrows+=`<path data-arrow="${key}" d="M${x1},${by} C${x1},${by+d} ${x2},${by+d} ${x2},${by+3}" fill="none" ${C?'pathLength="1" class="draw"':""} stroke="${col}" stroke-width="${C||I?2.4:1.5}" stroke-linecap="round" marker-end="url(#m${C?"a":I?"k":"g"})"${F?DIM:""}/>`+
+        `<circle cx="${x1}" cy="${by}" r="3.4" fill="${col}"${F?DIM:""}/>`;
+      labels+=star("b:"+fd.value,x2+6,by+17,"start",F);
+      if(C||I){ const ly=Math.max(by+Math.max(d*0.75+16,30),lastLy+18); lastLy=ly; low=Math.max(low,ly+14);
+        labels+=typeTag(fd.type,x1+5,by+12,col,false)+label(`${fd.name} ${C?"now points to":"is how we reach"} ${show(fd.value)}`,(x1+x2)/2,ly,col); }
+    });
+  });
+  /* cut links: the arrow this line just replaced, as a faint ghost for one step */
+  if(at>0){ const P=TRACE.steps[at-1], pb={}, pv={}; P.heap.forEach(n=>pb[n.addr]=n);
+    s.heap.forEach(n=>{ const o=pb[n.addr]; if(n.freed||!o||o.freed||cx[n.addr]===undefined) return;
+      (n.fields||[]).forEach((fd,j)=>{ const of=fd.kind==="ptr"&&(o.fields||[]).find(f=>f.name===fd.name), ov=of&&of.value;
+        if(!ov||ov===fd.value||cx[ov]===undefined) return;
+        const x1=cx[n.addr]+CW-20, x2=cx[ov]+20, by=HY+CARDH, d=30+Math.abs(cx[ov]-cx[n.addr])/STEP*12+j*10, ly=Math.max(by+Math.max(d*0.75+16,30),lastLy+18); lastLy=ly;
+        low=Math.max(low,ly+14);
+        ghosts+=`<path d="M${x1},${by} C${x1},${by+d} ${x2},${by+d} ${x2},${by+3}" fill="none" stroke="${DEAD}" stroke-width="1.8" stroke-dasharray="3 4"/>`;
+        labels+=label(`cut: ${fd.name} was ${show(ov)}`,(x1+x2)/2,ly,MUT); }); });
+    P.frames.forEach(f=>f.vars.forEach(v=>pv[v.addr+"|"+f.func+"|"+v.name]=v));
+    s.frames.forEach(f=>f.vars.forEach(v=>{ const o=pv[v.addr+"|"+f.func+"|"+v.name], sp=pos["v:"+v.addr];
+      if(!sp||!v.struct||!o||o.init===false||!o.value||o.value===v.value||cx[o.value]===undefined) return;
+      const t=cx[o.value]+CW/2-40;
+      ghosts+=`<path d="M${sp.x-12},${sp.y} C${sp.x-12},${sp.y+60} ${t},${HY-60} ${t},${HY-2}" fill="none" stroke="${DEAD}" stroke-width="1.8" stroke-dasharray="3 4"/>`+
+        `<text x="${t-4}" y="${HY-6}" font-size="10" text-anchor="end" fill="${MUT}">was</text>`; }));
+  }
+  /* pointers from the stack: to a node (several land side by side), into a node's field, or to another variable (like pp = &head) */
+  const ptrs=[], many={}, seen={}, stackAt={};
+  s.frames.forEach(f=>f.vars.forEach(v=>{ if(v.addr) stackAt[v.addr]=v; }));
+  const blockOf=p=>s.heap.find(n=>!n.freed&&p>n.addr&&p<n.addr+(n.size||16));
+  s.frames.forEach(f=>f.vars.forEach(v=>{ if(v.struct&&v.value&&v.init!==false&&cx[v.value]!==undefined){ ptrs.push(v); many[v.value]=(many[v.value]||0)+1; } }));
+  let li=0;
+  ptrs.sort((a,b)=>pos["v:"+a.addr].x-pos["v:"+b.addr].x).forEach(v=>{
+    const sp=pos["v:"+v.addr], tgt=s.heap.find(b=>b.addr===v.value), tf=tgt&&tgt.freed;
+    const i=(seen[v.value]=(seen[v.value]||0)+1)-1, tabR=cx[v.value]+8+show(v.value).length*7.4+18+12;   /* land right of the address tab */
+    const t=Math.max(tabR+i*22, cx[v.value]+CW/2+(i-(many[v.value]-1)/2)*22);
+    const col=tf?BAD:sp.C?AMB:sp.I?INK:MUT, mk=tf?"r":sp.C?"a":sp.I?"k":"g";
+    arrows+=`<path data-arrow="v:${v.addr}" d="M${sp.x},${sp.y} C${sp.x},${sp.y+60} ${t},${HY-60} ${t},${HY-2}" fill="none" ${sp.C&&!tf?'pathLength="1" class="draw"':""} ${tf?'stroke-dasharray="5 4"':""} stroke="${col}" stroke-width="${sp.C||sp.I?2.3:1.5}" stroke-linecap="round" marker-end="url(#m${mk})"${sp.F?DIM:""}/>`+
+      `<circle cx="${sp.x}" cy="${sp.y}" r="3.6" fill="${col}"${sp.F?DIM:""}/>`+typeTag(v.type,sp.x+6,sp.y+14,col,sp.F);
+    if(i===0) labels+=star("b:"+v.value,t+8,HY-4,"start",sp.F);
+    if(sp.F||!(sp.C||sp.I||tf)) return;                            /* sentences only on the active arrows */
+    const ly=sp.y+30+(li++%3)*18, lx=sp.x+(t-sp.x)*((ly-sp.y)/(HY-sp.y));
+    labels+=label(tf?`${sp.who} ${sp.C?"now points":"points"} to a freed block`:sp.C?`${sp.who} now points to ${show(v.value)}`:`${sp.who} is how we reach ${show(v.value)}`,lx,ly,col);
+  });
+  s.frames.forEach(f=>f.vars.forEach(v=>{
+    if(v.kind!=="ptr"||v.init===false||!v.value||!pos["v:"+v.addr]) return;
+    const sp=pos["v:"+v.addr], col=sp.C?AMB:sp.I?INK:MUT, mk=sp.C?"a":sp.I?"k":"g", tv=stackAt[v.value];
+    let d="", st="";
+    if(tv&&tv!==v&&(!v.target||v.target===tv.type||v.target===elemOf(tv.type))&&pos["v:"+tv.addr]){   /* to another variable, or an array's start */
+      const tp=pos["v:"+tv.addr], tx=tp.x-34; d=`M${sp.x},${sp.y} C${sp.x},${sp.y+44} ${tx},${tp.y+44} ${tx},${tp.y+3}`;   /* lands left of centre, clear of its own arrow */
+      st=star("v:"+tv.addr,tx-6,tp.y+17,"end",sp.F);
+    } else { const b=blockOf(v.value), f=b&&(b.fields||[]).find(f=>b.addr+f.offset===v.value);   /* into a node's field */
+      if(!f||cx[b.addr]===undefined) return;
+      const j=b.fields.indexOf(f), tx=cx[b.addr], ty=HY+42+j*FH+FH/2; d=`M${sp.x},${sp.y} C${sp.x},${sp.y+70} ${tx-50},${ty} ${tx-2},${ty}`;
+      st=star("h:"+b.addr+":"+f.name,tx-6,ty-7,"end",sp.F); }
+    arrows+=`<path data-arrow="v:${v.addr}" d="${d}" fill="none" ${sp.C?'pathLength="1" class="draw"':""} stroke="${col}" stroke-width="${sp.C||sp.I?2.3:1.5}" stroke-linecap="round" marker-end="url(#m${mk})"${sp.F?DIM:""}/>`+
+      `<circle cx="${sp.x}" cy="${sp.y}" r="3.6" fill="${col}"${sp.F?DIM:""}/>`+typeTag(v.type,sp.x+6,sp.y+14,col,sp.F);
+    labels+=st;
+  }));
+  Object.entries(CI).forEach(([k,ci])=>{ const tp=pos[k], sp=ci.src&&pos["v:"+ci.src.addr]; if(!tp||!sp) return;
+    const sx=sp.x+34, tx=tp.x+34;
+    arrows+=`<path d="M${sx},${sp.y} C${sx},${sp.y+30} ${tx},${tp.y+30} ${tx},${tp.y+3}" fill="none" stroke="${AMB}" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#ma)"/>`; });
+  if(RET){                                                        /* what just came back from the call, and where it's going */
+    const rp=RET.recv&&pos["v:"+RET.recv.addr];
+    if(rp){ const ax=rp.x+44;
+      arrows+=`<path d="M${ax},${rp.y+30} L${ax},${rp.y+4}" fill="none" stroke="${AMB}" stroke-width="1.8" stroke-dasharray="4 3" marker-end="url(#ma)"/>`;
+      labels+=label(`${RET.func} returned ${RET.txt}${RET.stored?`, now in ${RET.recv.name}`:""}`,ax,rp.y+44,AMB); }
+    else if(inner&&fpos[inner.func]) labels+=label(`${RET.func} returned ${RET.txt}, but nothing stores it`,fpos[inner.func].x+150,y+SLOTH+56,BAD);
+  }
+  const mk=(id,c)=>`<marker id="m${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,1L10,5L0,9L2.5,5z" fill="${c}"/></marker>`;
+  return `<svg viewBox="0 0 ${W} ${low}" xmlns="http://www.w3.org/2000/svg" font-family="'IBM Plex Sans',system-ui,sans-serif"><defs>${mk("a",AMB)}${mk("g",MUT)}${mk("k",INK)}${mk("r",BAD)}</defs>${o}${ghosts}${arrows}${labels}</svg>`;
+}
+/* ---------- memory layout view: the same state as raw bytes ---------- */
+const LIMIT=96;                                                  /* bytes drawn per variable or block */
+const hx=h=>h?h.match(/../g):[];
+const le=b=>b.reduceRight((v,x)=>(v<<8n)|BigInt(parseInt(x,16)),0n);          /* little-endian bytes -> BigInt */
+const leb=(v,n)=>Array.from({length:n},(_,i)=>Number((v>>BigInt(8*i))&0xffn).toString(16).padStart(2,"0"));
+const num=v=>v<=BigInt(Number.MAX_SAFE_INTEGER)?Number(v):null;
+const bigShow=v=>{ const n=num(v); return n===null?"0x"+v.toString(16):show(n); };
+function asSimple(b){                                            /* pointer bytes rewritten to the simple address */
+  if(!simple||b.length!==8) return b;
+  const n=num(le(b)), m=n?simpleOf(n):null;
+  return m===null?b:leb(BigInt(m),8);
+}
+function markHeapSteps(t){                                        /* which steps changed the heap at all */
+  let prev=null;
+  t.steps.forEach((s,i)=>{ const k=s.heap.map(n=>n.addr+(n.freed?"F":"")+(n.fields||[]).map(f=>f.value).join(",")).join("|");
+    s.hch=i===0||i===t.steps.length-1||k!==prev; prev=k; });
+}
+function markAllocator(t){                                       /* freed blocks: which 8-byte words free() rewrote */
+  const live={}, took={};
+  t.steps.forEach(s=>s.heap.forEach(n=>{
+    if(!n.freed){ if(n.bytes) live[n.addr]=n.bytes; delete took[n.addr]; return; }
+    if(!took[n.addr]){
+      const seen=freeWrites(s,n);                                  /* a gdb watchpoint saw them: no guessing */
+      const was=live[n.addr]||"", now=n.bytes||"", w=[];
+      for(let i=0;i*16<now.length;i++) if(was.slice(i*16,i*16+16)!==now.slice(i*16,i*16+16)) w.push(i);
+      took[n.addr]=seen||(was&&w.length?w:[0,1]);
+    }
+    n.alloc=took[n.addr];
+  }));
+}
+function tcacheNext(n,b,byA){                                    /* glibc stores next ^ (address >> 12): undo it */
+  const st=le(b);
+  for(const c of [st, st^(BigInt(n.addr)>>12n)]){
+    if(c===0n) return [0,"next free: NULL"];
+    const x=num(c); if(x!==null&&byA[x]) return [x,"next free: "+show(x)];
+  }
+  return [null,"scrambled pointer"];
+}
+function memModel(s){
+  const RC=reach(s), M={frames:[],blocks:[],bytes:new Map(),hdr:new Map(),RC}, byA={}, who=s.frames.length?s.frames[0].func:"";
+  s.heap.forEach(n=>byA[n.addr]=n);
+  const freedAt=t=>s.heap.some(n=>n.freed&&t>=n.addr&&t<n.addr+(n.size||16));
+  const ptrTxt=b=>{ const v=le(b), t=byA[num(v)];
+    return v===0n?{txt:"NULL"}:{txt:bigShow(v)+(t&&t.freed?" (freed)":""),cls:t&&t.freed?"bad":""}; };
+  s.frames.forEach((f,fi)=>{                                     /* stack: one row per aligned 8-byte slot */
+    const rows=new Map();
+    const row=a=>{ if(!rows.has(a)) rows.set(a,{addr:a,cells:Array(8).fill(null),nm:[],vl:[]}); return rows.get(a); };
+    f.vars.forEach(v=>{
+      if(!v.addr||!v.bytes) return;
+      const junk=v.init===false, raw=hx(v.bytes), b=v.kind==="ptr"&&!junk?asSimple(raw):raw, n=Math.min(b.length,LIMIT);
+      for(let k=0;k<n;k++){
+        const a=v.addr+k, ra=a-a%8, r=row(ra);
+        r.cells[a-ra]={a,h:b[k],cls:junk?"junk":""}; M.bytes.set(a,b[k]);
+        if(k===0){
+          r.nm.push(`${esc(v.name)}<small>${esc(v.type.replace(/struct /g,""))}</small>`);
+          r.vl.push(junk?{name:v.name,txt:"??",cls:"junk"}:v.kind==="ptr"?{name:v.name,...ptrTxt(raw)}:{name:v.name,txt:v.kind==="int"?String(v.value):"—"});
+          if(junk) r.tip="not set yet: these are leftover bytes";
+          const rc=RC["v:"+v.addr]; if(rc) r.tip=((r.tip||"")+reachTip(rc,who)).trim();
+          r.tip=(`${v.name}: ${v.arg?"parameter":"local"} of ${f.func}${v.decl?`, line ${v.decl}`:""}\n`+(r.tip||"")).trim();
+          if(!r.lad) r.lad=`${v.addr}|${f.func}|${v.name}`;
+          const t=v.kind==="ptr"&&!junk?num(le(raw)):0; if(t) r.ptrs=(r.ptrs||[]).concat({to:t,freed:freedAt(t),k:"v:"+v.addr});
+          r.bx=(r.bx||[]).concat("v:"+v.addr);
+          r.rtip=(r.rtip||"")+`\n${v.name} (${v.type}) at ${real(v.addr)}`;
+        } else if(a%8===0) r.nm.push(`<small>↳ ${esc(v.name)} +${k}</small>`);
+      }
+      if(b.length>n){ const top=v.addr+n-1; row(top-top%8).more=`${b.length-n} more bytes of ${v.name}`; }
+      const parts=v.kind==="other"&&!junk?arrParts(v.type,v.size,v.bytes):null, m=parts&&v.type.match(/\[(\d+)\]/);
+      if(parts&&m){ const w=v.size/(+m[1]);                        /* one row at a time: the elements that sit in it */
+        for(let a=v.addr-(v.addr%8);a<v.addr+n;a+=8){ const r=rows.get(a); if(!r) continue;
+          const got=parts.filter((_,i)=>v.addr+i*w<a+8&&v.addr+(i+1)*w>a);
+          r.vl=[{name:v.name,txt:got.join(" ")||"—"}]; } }
+    });
+    if(FRAMEINT&&f.rbp&&f.frame_bytes){                          /* fill in the rest of the frame */
+      const fb=hx(f.frame_bytes), lo=f.lo??f.rsp, hi=f.rbp+16;
+      for(let a=lo;a+8<=hi;a+=8){
+        const r=row(a);
+        for(let c=0;c<8;c++){ const ad=a+c, b=fb[ad-lo]; if(r.cells[c]||b===undefined) continue;
+          r.cells[c]={a:ad,h:b,cls:"sys"}; M.bytes.set(ad,b); }
+        if(!r.nm.length){ const ss=sysSlot(f,a,fb,lo); r.nm.push(`<small>${ss.name}</small>`); r.tip=ss.tip;
+          if(ss.name==="return addr"||ss.name==="saved rbp") r.vl.push({txt:show(num(le(fb.slice(a-lo,a-lo+8))))}); }
+      }
+    }
+    if(FRAMEINT&&f.rbp&&f.rsp){                                  /* rsp, rbp and the red zone */
+      const rb=rows.get(f.rbp-f.rbp%8), rs0=rows.get(f.rsp-f.rsp%8);
+      if(rb) rb.sp=f.rsp===f.rbp?"rsp = rbp":"rbp"; if(rs0&&f.rsp!==f.rbp) rs0.sp="rsp";
+      let first=true; [...rows.values()].sort((x,y)=>y.addr-x.addr).forEach(r=>{ if(r.addr+8<=f.rsp){ r.rz=true; if(first&&!r.sp){ r.sp="red zone"; r.spz=true; } first=false; } });
+    }
+    const rs=[...rows.values()].sort((x,y)=>y.addr-x.addr);
+    M.frames.push({func:f.func,sig:f.sig,rows:rs,inner:fi===0,top:rs.length?rs[0].addr:0,sp:FRAMEINT&&!!(f.rbp&&f.rsp)});
+  });
+  M.frames.sort((x,y)=>y.top-x.top);
+  s.heap.forEach(n=>{                                            /* heap: header rows, then one row per 8 bytes */
+    const raw=hx(n.bytes), size=Math.min(n.size||raw.length,raw.length,LIMIT), own=[], rows=[], H=hx(n.header);
+    (n.fields||[]).forEach(f=>{ if(f.offset!=null) for(let k=0;k<(f.size||0);k++) own[f.offset+k]=f; });
+    if(H.length===16){
+      const sz=le(H.slice(8));
+      [0,1].forEach(w=>{
+        const cells=H.slice(w*8,w*8+8).map((h,c)=>{ const a=n.addr-16+w*8+c; M.hdr.set(a,h); return {a,h,cls:"hdr",hdr:1}; });
+        rows.push({addr:n.addr-16+w*8,cells,cls:"hdr",nm:[w?"size":"prev_size"],
+          tip:w?`malloc's size field 0x${sz.toString(16)}: a ${Number(sz&~7n)}-byte chunk (header included); bit 0 set = the block before it is in use`
+               :"size of the block before, only used while that block is free",
+          vl:[{txt:w?`${Number(sz&~7n)}-byte chunk`:(sz&1n?"unused":String(le(H.slice(0,8))))}]});
+      });
+    }
+    for(let off=0;off<size;off+=8){
+      const w=off/8, alloc=!!n.freed&&(n.alloc||[]).includes(w), cells=[], nm=[], vl=[], ptrs=[];
+      let word=raw.slice(off,off+8);
+      if(alloc&&w===0){
+        const [x,txt]=tcacheNext(n,word,byA), m=x===0?0:x===null?null:simpleOf(x);
+        vl.push({txt}); if(simple&&m!==null) word=leb(BigInt(m),8);
+      }
+      for(let c=0;c<8;c++){
+        const k=off+c, f=own[k];
+        if(k>=size){ cells.push({cls:"none"}); continue; }
+        let h=word[c];
+        if(!alloc&&f&&f.kind==="ptr"&&f.size===8) h=asSimple(raw.slice(f.offset,f.offset+8))[k-f.offset];
+        cells.push({a:n.addr+k,h,cls:alloc?"alloc":!f?"pad":n.freed?"stale":""}); M.bytes.set(n.addr+k,h);
+      }
+      if(alloc){ nm.push(w===0?"tcache next":w===1?"tcache key":"allocator"); if(w===1) vl.push({txt:"double-free check"}); }
+      else (n.fields||[]).forEach(f=>{
+        if(f.offset==null||f.offset+f.size<=off||f.offset>=off+8) return;
+        if(f.offset<off){ nm.push(`<small>↳ ${esc(f.name)} +${off-f.offset}</small>`); return; }
+        const t=f.kind==="ptr"&&f.size===8?ptrTxt(raw.slice(f.offset,f.offset+8)):{txt:f.kind==="int"?String(f.value):"—"};
+        nm.push(esc(f.name)+(n.freed?"<small>old</small>":"")); vl.push({name:f.name,txt:t.txt,cls:n.freed?"":t.cls});
+        const to=!n.freed&&f.kind==="ptr"&&f.size===8?num(le(raw.slice(f.offset,f.offset+8))):0; if(to) ptrs.push({to,freed:freedAt(to),k:"h:"+n.addr+":"+f.name});
+      });
+      if(!nm.length) nm.push("<small>padding</small>");
+      const rfs=(n.fields||[]).filter(f=>f.offset>=off&&f.offset<off+8).map(f=>RC["h:"+n.addr+":"+f.name]).filter(Boolean);
+      const here=(n.freed?[]:(n.fields||[]).filter(f=>f.offset>=off&&f.offset<off+8)).map(f=>`\n${f.name} (${f.type}) at ${real(n.addr+f.offset)}, the block's start + ${f.offset}`).join("");
+      rows.push({addr:n.addr+off,cells,nm,vl,ptrs,bx:(n.fields||[]).filter(f=>f.offset>=off&&f.offset<off+8).map(f=>"h:"+n.addr+":"+f.name),rtip:here+rfs.map(rc=>reachTip(rc,who)).join(""),tip:!alloc?(n.freed?"left over from before free()":""):w===0
+        ?"free() wrote this: where the next free block of this size is (glibc stores it XOR this address >> 12)"
+        :w===1?"free() wrote this: a random key; free() checks it to catch a double free":"free() wrote this"});
+    }
+    M.blocks.push({n,rows,more:raw.length>size?raw.length-size:0});
+  });
+  return M;
+}
+const LEGEND=`<div class="legend"><span><i class="c chg"><b class="n">0a</b></i>changed by this line</span><span><i class="c pad"></i>padding, or not a variable</span><span><i class="c hdr">21</i>malloc's header</span><span><i class="c alloc">59</i>the allocator's, after free</span><span>⟶ points to the row at that address</span><span>?? = not set yet (leftover bytes)</span><span>8 bytes per row, lowest address on the left (little-endian)</span></div>`;
+function renderMem(s){
+  if(!s.frames.some(f=>f.vars.some(v=>v.bytes))&&!s.heap.some(n=>n.bytes))
+    return `<div class="note">This trace has no raw bytes. Make it again with the new trace.py: <code>gdb -q -batch -x trace.py ./prog</code></div>`;
+  const M=memModel(s), P=at>0?memModel(TRACE.steps[at-1]):null, R=reachable(s), RET=retInfo(s), LLm=listLines(s), prevPtr={};
+  if(P) [...P.frames.flatMap(f=>f.rows),...P.blocks.flatMap(b=>b.rows)].forEach(r=>(r.ptrs||[]).forEach(p=>prevPtr[p.k]=p.to));   /* where each pointer pointed a step ago */
+  let k=0, ri=0; ARROWS=[];
+  const LB=libBytes(s);
+  const cell=c=>{
+    if(!c) return `<i class="c gap" data-tip="not part of any variable"></i>`;
+    if(c.cls==="none") return `<i class="c none" data-tip="past the end of the struct"></i>`;
+    const old=P?(c.hdr?P.hdr:P.bytes).get(c.a):undefined, hot=!!P&&(c.hdr?old!==undefined&&old!==c.h:old!==c.h), lb=LB.get(c.a);
+    const tip=`byte at ${real(c.a)}`+(hot?`\nwas ${old===undefined?"not on screen":old}`:"")+
+      (lb?`\nwritten inside ${lb.func}()${lb.in&&lb.in!==lb.func?`, in ${lb.in}`:""}: a gdb watchpoint caught it`:"");
+    const cls=(c.cls||"")+(lb?" lib":"");
+    return hot?`<i class="c chg ${cls}" style="--k:${k++}" data-tip="${esc(tip)}"><b class="o">${old||""}</b><b class="n">${c.h}</b></i>`
+              :`<i class="c ${cls}" data-tip="${esc(tip)}">${c.h}</i>`;
+  };
+  const row=r=>{
+    const k0=k, id=ri++, cells=r.cells.map(cell).join(""), hot=k>k0;
+    (r.ptrs||[]).forEach(p=>ARROWS.push({src:id,to:p.to,freed:p.freed,hot,k:p.k}));
+    (r.bx||[]).forEach(k=>{ const pv=prevPtr[k], cur=(r.ptrs||[]).find(p=>p.k===k);                   /* cut links */
+      if(pv&&(!cur||cur.to!==pv)) ARROWS.push({src:id,to:pv,ghost:true,k:"ghost"}); });
+    const vals=r.vl.map(v=>`<span class="${v.cls||""}">${esc((r.vl.length>1&&v.name?v.name+" = ":"")+v.txt)}</span>`).join(", ");
+    return (r.more?`<div class="gapr">⋯ ${esc(r.more)}</div>`:"")+
+      `<div class="r${r.cls?" "+r.cls:""}${hot?" hot":""}${r.rz?" rz":""}" data-r="${id}" data-addr="${r.addr}"${r.lad?` data-lad="${esc(r.lad)}"`:""}${r.bx&&r.bx.length?` data-box="${r.bx.join(" ")}"`:""} data-tip="${esc((r.tip?r.tip+"\n":"")+"real address "+real(r.addr)+(r.rtip||""))}">${r.sp?`<span class="spm${r.spz?" rz":""}">${r.sp}</span>`:""}<span class="a">${show(r.addr)}</span><span class="nm">${r.nm.join(" ")}</span>${cells}<span class="vl">${vals}</span></div>`;
+  };
+  const OFFS=`<div class="r off"><span></span><span></span>${[0,1,2,3,4,5,6,7].map(i=>`<i class="c">+${i}</i>`).join("")}<span></span></div>`;
+  let st="", hp=[];
+  M.frames.forEach(f=>{
+    let body="", last=null;
+    f.rows.forEach(r=>{ if(last!==null&&last-r.addr>8) body+=`<div class="gapr">⋯ ${last-r.addr-8} bytes that are not a variable</div>`; body+=row(r); last=r.addr; });
+    st+=`<div class="fr${f.sp?" sp":""}" style="--fc:${fcol(f.func)[0]};--ft:${fcol(f.func)[1]}"><div class="fh">${esc(f.func)}${f.inner&&M.frames.length>1?"<em>running now</em>":""}${f.sig?`<span class="sig">${esc(f.sig)}</span>`:""}${f.inner&&RET?`<span class="ret${RET.recv?"":" bad"}">${esc(`↩ ${RET.func} returned ${RET.txt}`+(RET.recv?`, ${RET.stored?"now in":"going into"} ${RET.recv.name}`:", but nothing stores it"))}</span>`:""}</div>${f.rows.length?OFFS+body:`<div class="note">no variables</div>`}</div>`;
+  });
+  let nhid=0;
+  M.blocks.forEach(({n,rows,more})=>{
+    const freed=!!n.freed, lost=!freed&&!R.has(n.addr);
+    if(FOLD&&(freed||lost)){ nhid++; return; }
+    const rb=M.RC["b:"+n.addr];
+    hp.push([n.addr,`<div class="card${freed?" freed":lost?" lost":""}" data-box="b:${n.addr}"><div class="ct" data-tip="real address ${real(n.addr)}${esc(reachTip(rb,s.frames.length?s.frames[0].func:""))}"><b>${show(n.addr)}</b>${rb?`<span class="rx" data-ex="${esc(rb.a)}">= ${esc(orText(rb.a,rb.alt.map(o=>o.a),24))}</span>`:!freed&&!lost&&s.frames.length&&!("b:"+n.addr in M.RC._D)?`<span class="nr">not reachable from here</span>`:""}<span>${esc(n.type.replace("struct ",""))}, ${n.size} bytes</span><em>${freed?"freed":lost?"unreachable — leaked":""}</em></div>${OFFS}${rows.map(row).join("")}${more?`<div class="gapr">⋯ ${more} more bytes</div>`:""}</div>`]);
+  });
+  const own=new Set(s.heap.map(n=>n.addr));
+  (s.chunks||[]).forEach(c=>{ if(own.has(c.addr)) return;                   /* chunks that aren't your structs */
+    const [title,sub]=chunkText(c), top=c.state==="top";
+    hp.push([c.addr,`<div class="card foreign${top?" top":""}" data-tip="chunk at ${real(c.addr-16)}, 0x${c.size.toString(16)} bytes with its header"><div class="ct"><b>${simple?"":real(c.addr)}</b><span>${title}, 0x${(top?c.size:c.size-16).toString(16)} bytes</span><em>${sub}</em></div></div>`]); });
+  if(nhid) hp.push([Infinity,`<div class="card foreign"><div class="ct"><b></b><span>${nhid} freed or leaked block${nhid===1?"":"s"} hidden</span><em>hide freed is on</em></div></div>`]);
+  hp=hp.sort((p,q)=>p[0]-q[0]).map(x=>x[1]).join("");
+  const d=Math.max(12,Math.min(70,(timer?300:1000)/Math.max(1,k)));
+  ADELAY=timer||!k?0:Math.round((k-1)*d+220);                           /* changed arrows draw once their bytes are in */
+  const LIBL=TRACE.watchpoints!==undefined?`<div class="legend" style="margin-top:4px"><span><i class="c lib">2a</i>${TRACE.watchpoints?"written inside a library call like free(): a gdb watchpoint caught it":"gdb watchpoints didn't work on this computer, so writes inside library calls aren't marked"}</span></div>`:"";
+  return `<div class="mem${simple?"":" real"}" style="--d:${Math.round(d)}ms">${LEGEND}${LIBL}<div class="cols"><div class="stk"><h2>Stack<span>high addresses on top, grouped by function</span></h2>${st||`<div class="note">no variables</div>`}</div><div class="hp"><h2>Heap<span>malloc's 16-byte header in grey on top</span></h2>${LLm.map(l=>`<div class="lists${l.bad?" bad":""}"><b>${esc(l.names)}:</b> ${esc(l.text)} ${l.count?`<span>(${l.count} node${l.count===1?"":"s"})</span>`:""}</div>`).join("")}<div class="heap">${hp||`<div class="note">no heap blocks yet</div>`}</div></div></div></div>`;
+}
+let ARROWS=[], ADELAY=0;
+function drawArrows(anim){                                       /* each pointer row -> the row whose address it holds */
+  const mem=$("pic").querySelector(".mem"); if(!mem) return;
+  const old=mem.querySelector("svg.arrows"); if(old) old.remove();
+  const B=mem.getBoundingClientRect(), W=mem.scrollWidth, H=mem.scrollHeight, zf=B.width/mem.offsetWidth||1;   /* zf: the picture zoom */
+  const box=el=>{ const b=el.getBoundingClientRect(); return {l:(b.left-B.left)/zf, r:(b.right-B.left)/zf, y:((b.top+b.bottom)/2-B.top)/zf}; };
+  const cards=[...mem.querySelectorAll(".card")], lane=cards.length?Math.max(...cards.map(c=>box(c).r))+12:0;
+  let low="", high="", nh=0, ns=0;
+  ARROWS.forEach(a=>{
+    const src=mem.querySelector(`[data-r="${a.src}"]`), ra=a.to-a.to%8;
+    const dst=mem.querySelector(`.r[data-addr="${ra}"]:not(.hdr)`)||mem.querySelector(`.r[data-addr="${ra}"]`);
+    if(!src||!dst) return;                                       /* NULL, garbage, or not on screen */
+    const sc=src.closest(".card"), tc=dst.closest(".card"), S=box(src), T=box(dst), s=sc?box(sc):S, t=tc?box(tc):T;
+    let d;
+    if(!sc&&tc){ const dx=Math.max(20,(t.l-s.r)/2); d=`M${s.r},${S.y} C${s.r+dx},${S.y} ${t.l-dx},${T.y} ${t.l},${T.y}`; }   /* stack -> heap */
+    else if(sc&&tc){ const L=lane+(nh++%4)*8; d=`M${s.r},${S.y} C${L},${S.y} ${L},${T.y} ${t.r},${T.y}`; }                    /* heap -> heap */
+    else if(!sc){ const L=s.r+16+(ns++%4)*7; d=`M${s.r},${S.y} C${L},${S.y} ${L},${T.y} ${t.r},${T.y}`; }                    /* stack -> stack */
+    else { const dx=Math.max(20,(s.l-t.r)/2); d=`M${s.l},${S.y} C${s.l-dx},${S.y} ${t.r+dx},${T.y} ${t.r},${T.y}`; }          /* heap -> stack */
+    if(a.ghost){ low+=`<path d="${d}" fill="none" stroke="${DEAD}" stroke-width="1.6" stroke-dasharray="3 4"/>`; return; }   /* what this line cut */
+    const col=a.freed?BAD:a.hot?AMB:MUT, m=a.freed?"r":a.hot?"a":"g";
+    const p=`<path data-arrow="${a.k||""}" d="${d}" fill="none" stroke="${col}" stroke-width="${a.freed||a.hot?2:1.2}" marker-end="url(#x${m})"`+
+      (a.freed?` stroke-dasharray="5 4"`:a.hot&&anim?` pathLength="1" class="draw" style="animation-delay:${ADELAY}ms"`:"")+`/>`;
+    if(a.freed||a.hot) high+=p; else low+=p;
+  });
+  const mk=(id,c)=>`<marker id="x${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="${c}"/></marker>`;
+  mem.insertAdjacentHTML("beforeend",`<svg class="arrows" style="width:${W}px;height:${H}px" viewBox="0 0 ${W} ${H}"><defs>${mk("a",AMB)}${mk("g",MUT)}${mk("r",BAD)}</defs>${low}${high}</svg>`);
+}
+
+function render(){
+  const s=TRACE.steps[at];
+  const z=PZ==="fit"?null:+PZ/100, pic=$("pic");
+  pic.innerHTML=bugHTML(s)+wordsHTML()+leakHTML(s)+ladderHTML(s)+(view==="mem"?(z?`<div class="zo"><div class="zw" style="transform:scale(${z})">${renderMem(s)}</div></div>`:renderMem(s)):renderCards(s));
+  pic.querySelectorAll(".ladder").forEach(p=>p.style.zoom=z||1);
+  if(view==="cards"){ const svg=pic.querySelector("svg"), vb=svg&&svg.getAttribute("viewBox");
+    if(vb){ const W=+vb.split(" ")[2], zz=z||Math.max(0.8,(pic.clientWidth-20)/W);                      /* fit, but never below 80% */
+      if(z||zz>(pic.clientWidth-20)/W){ svg.style.width=(W*zz)+"px"; svg.style.minWidth="0"; } } }
+  renderWatch(); showWatchBadges();
+  if(view==="mem"){ drawArrows(true);
+    const zw=pic.querySelector(".zw"), zo=pic.querySelector(".zo"); if(zw&&zo){ zo.style.width=zw.offsetWidth*z+"px"; zo.style.height=zw.offsetHeight*z+"px"; } }
+  const con=$("console"), prevOut=at>0?(TRACE.steps[at-1].out||""):"", outTxt=s.out||"";
+  con.innerHTML=outTxt?esc(outTxt).replace(/\n$/,"").split("\n").map((l,i,arr)=>`<div style="${(i===arr.length-1&&outTxt!==prevOut)?"background:"+AMBG+";font-weight:700":""}">${l}</div>`).join(""):`<div style="color:${MUT}">(no output yet)</div>`;
+  const RA=ranAt(at), ran=RA?RA.line:0;
+  $("bugB").hidden=!BUGS.length; $("bugB").textContent=`${BUGS.length} bug${BUGS.length===1?"":"s"}`;
+  $("pos").innerHTML=`<b>${at+1}</b>/${TRACE.steps.length}<span>${ran?`ran ${ran} → `:""}next ${s.line}</span><span>in ${esc(s.func)}</span>`;
+  $("slider").value=at;
+  if(SRC){
+    if(!FNL) FNL=fnOfLines();
+    const bugL=new Set(BUGS.map(b=>b.line));
+    $("code").innerHTML=SRC.map((l,i)=>`<div class="cl${i+1===ran?" hi":""}${i+1===s.line?" nx":""}${bugL.has(i+1)?" bug":""}" data-l="${i+1}"${bugL.has(i+1)?' title="a bug happens on this line: click to jump there"':""}><span class="ln">${i+1}</span><span class="src">${exLine(l)||" "}</span></div>`).join("");   /* one span, so leading spaces survive */
+    const pre=$("code"), hi=pre.querySelector(".hi")||pre.querySelector(".nx");
+    if(hi) pre.scrollTop=hi.offsetTop-pre.offsetTop-pre.clientHeight/2;                        /* scroll the code only, never the page */
+  }
+}
+/* ---------- loading and controls ---------- */
+function loadTrace(txt){
+  TRACE=JSON.parse(txt);
+  TRACE.steps.forEach(st=>{                       /* accept traces from the first trace.py */
+    st.heap=(st.heap||[]).map(n=> n.fields ? n : {addr:n.addr, type:n.type||"struct", freed:false,
+      fields:[{name:"val",type:"int",kind:"int",value:n.val},{name:"next",type:"ptr",kind:"ptr",value:n.next}]});
+    (st.frames||[]).forEach(fr=>(fr.vars||[]).forEach(v=>{ if(v.struct===undefined) v.struct=v.node_ptr?"struct":null; }));
+  });
+  markAllocator(TRACE); markHeapSteps(TRACE); markInit(TRACE); frameColors(TRACE); EXNAMES=null; markBugs(TRACE); WATCH.forEach(w=>w.vals=null); EXNAMES=null; EXC=new Map(); RCACHE.clear(); at=0; buildMap(TRACE);
+  try{ const v=+localStorage.getItem(posKey()); if(v>0&&v<TRACE.steps.length) at=v; }catch(e){}          /* back where you were */
+  $("drop").style.display="none"; $("main").style.display="grid";
+  $("slider").max=TRACE.steps.length-1; draw();
+}
+function setSrc(t){ SRC=t.split("\n"); FNL=null; EXC=new Map(); if(TRACE){ markInit(TRACE); markBugs(TRACE); WATCH.forEach(w=>w.vals=null); draw(); } }
+function readFile(f,cb){ const r=new FileReader(); r.onload=()=>cb(r.result); r.readAsText(f); }
+$("openT").onclick=()=>$("fT").click(); $("openC").onclick=()=>$("fC").click();
+$("fT").onchange=e=>readFile(e.target.files[0],loadTrace);
+$("fC").onchange=e=>readFile(e.target.files[0],setSrc);
+document.addEventListener("dragover",e=>e.preventDefault());
+document.addEventListener("drop",e=>{
+  e.preventDefault();
+  for(const f of e.dataTransfer.files) readFile(f, f.name.endsWith(".json")?loadTrace:setSrc);
+});
+const go=d=>{ if(!TRACE) return; let i=at+d;
+  if(HEAPONLY||WONLY||BONLY){ const W=WONLY?WCH():null;                                   /* skip to the next step that matters */
+    while(i>0&&i<TRACE.steps.length-1&&!((HEAPONLY&&TRACE.steps[i].hch)||(W&&W.has(i))||(BONLY&&TRACE.steps[i].bugs&&TRACE.steps[i].bugs.length))) i+=d; }
+  at=Math.max(0,Math.min(TRACE.steps.length-1,i)); draw(); };
+function draw(){ try{ render(); const k=posKey(); if(k) try{ localStorage.setItem(k,String(at)); }catch(_){ } }catch(e){ $("pos").textContent="step "+(at+1)+" failed: "+e.message; console.error(e); } }
+function jumpFn(d){
+  if(!TRACE) return;
+  for(let i=at+d; i>=0 && i<TRACE.steps.length; i+=d)
+    if(TRACE.steps[i].func!==TRACE.steps[at].func){ at=i; draw(); return; }
+}
+$("fprev").onclick=()=>jumpFn(-1); $("fnext").onclick=()=>jumpFn(1);
+$("prev").onclick=()=>go(-1); $("next").onclick=()=>go(1);
+$("slider").oninput=e=>{ at=+e.target.value; draw(); };
+$("simple").onchange=e=>{ simple=e.target.checked; draw(); };
+$("pz").value=PZ; $("cz").value=String(CZ); $("main").style.setProperty("--cz",CZ/100);
+for(const [id,set] of [["wordsC",v=>WORDS=v],["lorder",v=>LORDER=v],["hstep",v=>HEAPONLY=v],["wstep",v=>WONLY=v],["bstep",v=>BONLY=v],["fold",v=>FOLD=v],["fint",v=>FRAMEINT=v]])
+  $(id).onchange=e=>{ set(e.target.checked); if(TRACE) draw(); };
+$("pz").onchange=e=>{ PZ=e.target.value; try{ localStorage.setItem("mv.pz",PZ); }catch(_){ } if(TRACE) draw(); };
+$("cz").onchange=e=>{ CZ=+e.target.value; try{ localStorage.setItem("mv.cz",CZ); }catch(_){ } $("main").style.setProperty("--cz",CZ/100); };
+function setView(v){ view=v; $("vC").classList.toggle("on",v==="cards"); $("vM").classList.toggle("on",v==="mem"); saveSet(); if(TRACE) draw(); }
+$("vC").onclick=()=>setView("cards"); $("vM").onclick=()=>setView("mem");
+function play(){
+  if(timer){ clearInterval(timer); timer=null; $("play").textContent="▶ Play"; return; }
+  $("play").textContent="■ Pause";
+  timer=setInterval(()=>{ if(at>=TRACE.steps.length-1){ play(); return; } go(1); },600);
+}
+$("play").onclick=play;
+document.addEventListener("keydown",e=>{
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  if(e.target&&e.target.matches&&e.target.matches("input[type=text]")) return;                          /* typing a watch expression */
+  if(e.key==="Escape"){ help(false); closeMenu(); return; }
+  if(e.key==="?"){ help($("help").hidden); return; }
+  if(!$("help").hidden) return;
+  if(e.key===" "&&e.target&&e.target.matches&&e.target.matches("input[type=checkbox],select,button")) return;   /* Space still works on the focused control */
+  if(e.key==="ArrowRight") go(1); else if(e.key==="ArrowLeft") go(-1);
+  else if(e.key===" "){ e.preventDefault(); play(); }
+  else if(e.key==="v"||e.key==="V") setView(view==="mem"?"cards":"mem");
+});
+const tip=document.createElement("div");
+tip.style.cssText="position:fixed;display:none;background:#fff;border:1px solid #708090;border-radius:6px;padding:6px 8px;font:12px/1.4 ui-monospace,Menlo,monospace;box-shadow:0 2px 8px rgba(0,0,0,.12);pointer-events:none;z-index:9";
+document.body.appendChild(tip);
+let HOVEX=null;
+function tipAt(e,text){ tip.innerHTML=esc(text).replace(/\n/g,"<br>"); tip.style.display="block"; tip.style.left=Math.min(e.clientX+14,innerWidth-300)+"px"; tip.style.top=(e.clientY+14)+"px"; }
+function follow(el,ex,fr,e){ if(HOVEX!==el){ HOVEX=el; const res=evalExpr(TRACE.steps[at],fr,ex); showHops(res); el._t=hopText(ex,res); } tipAt(e,el._t); }
+function unfollow(){ if(HOVEX){ HOVEX=null; clearHops(); } tip.style.display="none"; }
+$("code").addEventListener("mousemove",e=>{
+  const sp=e.target.closest&&e.target.closest(".ex"); if(!sp||!TRACE){ if(HOVEX) unfollow(); return; }
+  const fn=FNL&&FNL[+sp.closest(".cl").dataset.l-1], fr=TRACE.steps[at].frames.find(f=>f.func===fn);
+  if(!fr){ if(HOVEX) unfollow(); tipAt(e,`${fn||"this function"} isn't running at this step`); return; }
+  follow(sp,sp.dataset.ex,fr,e);
+});
+$("code").addEventListener("mouseleave",unfollow);
+$("pic").addEventListener("mousemove",e=>{
+  const ex=e.target.closest&&e.target.closest("[data-ex]");
+  if(ex&&TRACE&&TRACE.steps[at].frames.length){ hoverBox(null); follow(ex,ex.getAttribute("data-ex"),TRACE.steps[at].frames[0],e); return; }
+  if(HOVEX) unfollow();
+  const t=e.target.closest&&e.target.closest("[data-tip]");
+  hoverBox(t);
+  if(!t){ tip.style.display="none"; return; }
+  tip.innerHTML=esc(t.getAttribute("data-tip")).replace(/\n/g,"<br>");
+  tip.style.display="block"; tip.style.left=Math.min(e.clientX+14,innerWidth-300)+"px"; tip.style.top=(e.clientY+14)+"px";
+});
+$("pic").addEventListener("mouseleave",()=>{ unfollow(); hoverBox(null); });
+let HOVB=null;
+function hoverBox(el){                                            /* outline the box under the mouse: a slot, a field, a card, a row */
+  if(el===HOVB) return;
+  const pic=$("pic"); pic.querySelectorAll(".hovbox").forEach(x=>x.remove()); pic.querySelectorAll(".hovrow").forEach(x=>x.classList.remove("hovrow"));
+  HOVB=el; if(!el) return;
+  if(el.ownerSVGElement){ const bb=el.getBBox();
+    el.ownerSVGElement.insertAdjacentHTML("beforeend",`<rect class="hovbox" x="${bb.x-3}" y="${bb.y-3}" width="${bb.width+6}" height="${bb.height+6}" rx="8" fill="${REACH}" fill-opacity="0.06" stroke="${REACH}" stroke-width="2" pointer-events="none"/>`); }
+  else el.classList.add("hovrow");
+}
+$("pic").addEventListener("click",e=>{
+  if(e.target.closest(".lx")){ LADDER=null; draw(); return; }
+  const wb=e.target.closest("[data-watch]"); if(wb){ const [fn,ex]=wb.dataset.watch.split("|"); addWatch(fn,ex); return; }
+  const bb=e.target.closest("[data-bug]"); if(bb){ bugJump(+bb.dataset.bug); return; }
+  const gg=e.target.closest(".leak [data-go]"); if(gg){ at=+gg.dataset.go; draw(); return; }
+  const g=e.target.closest("[data-lad]"); if(g){ LADDER=g.getAttribute("data-lad"); draw(); }
+});
+$("wfn").onchange=e=>{ WFN=e.target.value; };
+$("wex").addEventListener("input",e=>{ WEX=e.target.value; });
+$("wex").addEventListener("keydown",e=>{ if(e.key==="Enter"){ addWatch($("wfn").value,$("wex").value); } });
+$("wadd").onclick=()=>addWatch($("wfn").value,$("wex").value);
+$("wlist").addEventListener("click",e=>{
+  const t=e.target, b=t.closest("button");
+  if(b&&b.dataset.wx!==undefined){ WATCH.splice(+b.dataset.wx,1); saveWatch(); draw(); return; }
+  if(b&&b.dataset.wp!==undefined){ watchJump(+b.dataset.wp,-1); return; }
+  if(b&&b.dataset.wn!==undefined){ watchJump(+b.dataset.wn,1); return; }
+  const g=t.closest("[data-go]"); if(g){ at=+g.dataset.go; draw(); return; }
+  const tl=t.closest("svg[data-tl]"); if(tl&&TRACE){ const r=tl.getBoundingClientRect();                  /* click anywhere on the line */
+    at=Math.round((e.clientX-r.left)/r.width*(TRACE.steps.length-1)); draw(); }
+});
+$("wlist").addEventListener("toggle",e=>{ const d=e.target; if(d.dataset&&d.dataset.k!==undefined&&WATCH[+d.dataset.k]) WATCH[+d.dataset.k].open=d.open; },true);
+/* ---------- the View menu, the legend, and remembering your settings ---------- */
+const closeMenu=()=>{ $("menu").hidden=true; $("menuB").setAttribute("aria-expanded","false"); };
+$("menuB").onclick=e=>{ e.stopPropagation(); const m=$("menu"), open=m.hidden; m.hidden=!open; $("menuB").setAttribute("aria-expanded",String(open));
+  if(open){ m.style.left=""; m.style.right="0"; if(m.getBoundingClientRect().left<8){ m.style.left="0"; m.style.right="auto"; } } };
+document.addEventListener("click",e=>{ if(!$("menu").hidden&&e.target&&e.target.closest&&!e.target.closest(".mw")) closeMenu(); });
+function help(on){ $("help").hidden=!on; if(on) $("helpX").focus(); }
+$("helpB").onclick=()=>help(true); $("helpX").onclick=()=>help(false);
+$("help").addEventListener("click",e=>{ if(e.target.id==="help") help(false); });
+function posKey(){ return TRACE?`mv.at.${TRACE.file||"trace"}.${TRACE.steps.length}`:null; }
+function saveSet(){ try{ localStorage.setItem("mv.set",JSON.stringify({simple,fint:FRAMEINT,lorder:LORDER,fold:FOLD,hstep:HEAPONLY,wstep:WONLY,bstep:BONLY,words:WORDS,view})); }catch(e){} }
+function loadSet(){
+  const S={simple:true,fint:true,lorder:false,fold:false,hstep:false,wstep:false,bstep:false,words:true,view:"cards"};
+  try{ Object.assign(S,JSON.parse(localStorage.getItem("mv.set")||"{}")); }catch(e){}
+  simple=S.simple; FRAMEINT=S.fint; LORDER=S.lorder; FOLD=S.fold; HEAPONLY=S.hstep; WONLY=S.wstep; BONLY=!!S.bstep; WORDS=S.words!==false;
+  [["simple",S.simple],["fint",S.fint],["lorder",S.lorder],["fold",S.fold],["hstep",S.hstep],["wstep",S.wstep],["bstep",S.bstep],["wordsC",S.words!==false]].forEach(([id,v])=>{ $(id).checked=!!v; });
+  setView(S.view==="mem"?"mem":"cards");
+}
+["simple","fint","lorder","fold","hstep","wstep","bstep","wordsC"].forEach(id=>$(id).addEventListener("change",saveSet));
+$("bugB").onclick=()=>bugJump(1);
+$("reset").onclick=()=>{ try{ ["mv.set","mv.pz","mv.cz"].forEach(k=>localStorage.removeItem(k)); }catch(e){}
+  PZ="fit"; CZ=100; $("pz").value="fit"; $("cz").value="100"; $("main").style.setProperty("--cz",1); loadSet(); if(TRACE) draw(); };
+/* click a code line: jump to the next time it runs (Shift: the time before) */
+$("code").addEventListener("click",e=>{
+  const cl=e.target.closest&&e.target.closest(".cl"); if(!cl||!TRACE) return;
+  if(!e.shiftKey&&window.getSelection&&String(window.getSelection())) return;                    /* selecting text, not jumping */
+  const l=+cl.dataset.l, N=TRACE.steps.length, d=e.shiftKey?-1:1;
+  for(let k=1;k<=N;k++){ const i=((at+d*k)%N+N)%N, RA=ranAt(i); if(RA&&RA.line===l){ at=i; draw(); return; } }
+  for(let k=1;k<=N;k++){ const i=((at+d*k)%N+N)%N; if(TRACE.steps[i].line===l){ at=i; draw(); return; } }
+  tipAt(e,`line ${l} never runs in this trace`); setTimeout(()=>{ tip.style.display="none"; },1600);
+});
+$("code").addEventListener("mousedown",e=>{ if(e.shiftKey) e.preventDefault(); });              /* Shift-click jumps back instead of selecting text */
+const setBarH=()=>document.documentElement.style.setProperty("--barh",$("bar").offsetHeight+"px");
+setBarH(); window.addEventListener("resize",setBarH);
+loadSet();
+window.addEventListener("resize",()=>{ if(TRACE&&view==="mem") drawArrows(false); });
+/* ---------- live editor: type C, the server runs gcc + gdb, the picture updates ---------- */
+(function(){
+  const css=document.createElement("style");
+  css.textContent=`
+#ed{position:fixed;left:0;top:var(--barh,52px);bottom:0;width:320px;z-index:2;display:flex;flex-direction:column;background:#fff;border-right:1px solid var(--line);box-shadow:4px 0 12px rgba(20,33,61,.08)}
+#ed[hidden]{display:none}
+#edT{flex:1;resize:none;border:0;outline:0;padding:10px 12px;font:13px/1.55 var(--mono);color:var(--ink);background:#FBFCFE;tab-size:2;white-space:pre}
+#edS{height:auto;max-height:40%;padding:6px 12px;border:0;border-top:1px solid var(--line);font:12px var(--mono);color:var(--muted);background:#fff;overflow:auto;white-space:pre-wrap}
+#edS.err{color:#B91C1C;background:#FEF2F2}
+#edS.ok{color:#166534}`;
+  document.head.appendChild(css);
+
+  const btn=document.createElement("button");
+  btn.id="editB"; btn.textContent="✎ Write code"; btn.title="Type C here: it runs 1 second after you stop typing";
+  $("openC").after(btn);
+
+  const ed=document.createElement("div");
+  ed.id="ed"; ed.hidden=true;
+  ed.innerHTML=`<textarea id="edT" spellcheck="false" placeholder="type your C program here"></textarea><pre id="edS">Ctrl+Enter runs it right away</pre>`;
+  document.body.appendChild(ed);
+  const T=$("edT"), S=$("edS");
+
+  try{ T.value=localStorage.getItem("mv.code")||""; }catch(e){}          /* your code survives a reload */
+  btn.onclick=()=>{ ed.hidden=!ed.hidden; if(!ed.hidden) T.focus(); };
+
+  let wait=null, runs=0;
+  async function run(){
+    const code=T.value, me=++runs;
+    if(!code.trim()) return;
+    S.className=""; S.textContent="compiling and tracing…";
+    let r, text;
+    try{ r=await fetch("/run",{method:"POST",body:code}); text=await r.text(); }
+    catch(e){ if(me===runs){ S.className="err"; S.textContent="can't reach the server: is python3 server.py running?"; } return; }
+    if(me!==runs) return;                                                /* you typed again: a newer run is coming */
+    if(!r.ok){ S.className="err"; S.textContent=text; return; }          /* gcc's error */
+    loadTrace(text); setSrc(code);
+    at=TRACE.steps.length-1; draw();                                     /* show the end; step back with ← */
+    S.className="ok"; S.textContent=`✓ ${TRACE.steps.length} steps`;
+  }
+
+  T.addEventListener("input",()=>{
+    try{ localStorage.setItem("mv.code",T.value); }catch(e){}
+    clearTimeout(wait); wait=setTimeout(run,1000);                      /* run 1 second after you stop typing */
+  });
+  T.addEventListener("keydown",e=>{
+    e.stopPropagation();                                                 /* Space and arrows type, they don't step */
+    if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); clearTimeout(wait); run(); }
+    if(e.key==="Tab"){ e.preventDefault(); T.setRangeText("  ",T.selectionStart,T.selectionEnd,"end"); }
+  });
+})();
+/* ---------- blueprints: what each struct looks like, even before one exists ---------- */
+(function(){
+  const css=document.createElement("style");
+  css.textContent=`
+#bp{padding:12px 14px 2px}
+#bp:empty{display:none}
+.bph{font-weight:600;color:var(--ink);margin:0 0 8px}
+.bph small{font-weight:400;color:var(--muted);margin-left:8px}
+.bpc{display:inline-block;vertical-align:top;margin:0 14px 10px 0;max-width:100%}
+.bpt{font:600 13px var(--mono);color:var(--ink);margin:0 0 4px}
+.bpt small{font-weight:400;color:var(--muted)}
+.bpr{display:flex;gap:4px;max-width:100%;padding:4px;border:1.3px dashed var(--border);border-radius:10px;background:#fff}
+.bpf{min-width:64px;display:flex;flex-direction:column;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:#EEF2F7;font:12px/1.4 var(--mono);color:var(--ink)}
+.bpf span{color:var(--muted)}
+.bpf i{font-style:normal;font-size:11px;color:var(--faint)}
+.bpf.pad{background:repeating-linear-gradient(135deg,#fff 0 3px,#E6EAEE 3px 4.5px);color:var(--muted)}`;
+  document.head.appendChild(css);
+
+  const B=document.createElement("div");
+  B.id="bp"; $("pic").before(B);                                         /* sits just above the stack picture */
+  const T=$("edT"), esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+  function show(list){
+    B.innerHTML=!list.length?"":`<div class="bph">Blueprints<small>what each struct looks like: no memory is used until you create one</small></div>`+
+      list.map(s=>`<div class="bpc"><div class="bpt">${esc(s.name)} <small>${s.size} bytes</small></div>`+
+        `<div class="bpr" style="width:${Math.max(160,s.size*34)}px">`+                                   /* wider struct, wider card */
+        s.fields.map(f=>f.name===null
+          ?`<div class="bpf pad" style="flex:${f.size} 1 0"><b>padding</b><span>${f.size} B</span><i>offset ${f.offset}</i></div>`
+          :`<div class="bpf" style="flex:${f.size} 1 0"><b>${esc(f.name)}</b><span>${esc(f.type)}, ${f.size} B</span><i>offset ${f.offset}</i></div>`
+        ).join("")+`</div></div>`).join("");
+    if(list.length&&!TRACE){ $("drop").style.display="none"; $("main").style.display="grid"; }   /* no main() yet: show the cards anyway */
+  }
+
+  let wait=null, runs=0;
+  async function load(){
+    const code=T.value, me=++runs;
+    let r, text;
+    try{ r=await fetch("/blueprints",{method:"POST",body:code}); text=await r.text(); }catch(e){ return; }
+    if(me!==runs||!r.ok) return;                                         /* half-typed code: keep the last good cards */
+    show(JSON.parse(text));
+  }
+  T.addEventListener("input",()=>{ clearTimeout(wait); wait=setTimeout(load,1000); });
+  if(T.value.trim()) load();                                             /* code saved from last time */
+})();
+</script>
+</body>
+</html>
