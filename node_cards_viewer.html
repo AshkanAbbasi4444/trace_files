@@ -31,6 +31,8 @@ input[type=range]{flex:1;min-width:90px;accent-color:var(--ink)}
 @media (max-width:1300px){.pos span:last-child{display:none}}
 .pos b{color:var(--ink);font-weight:700}
 .pos span{margin-left:12px}
+.pvb{font:600 10.5px var(--sans);letter-spacing:.05em;text-transform:uppercase;color:#4338CA;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.pvb[hidden]{display:none}
 .chip{position:relative;display:inline-flex}
 .chip input{position:absolute;opacity:0;width:1px;height:1px}
 .chip span{font-size:12.5px;padding:3px 11px;border:1px solid var(--line);border-radius:999px;color:var(--muted);background:#fff;cursor:pointer;user-select:none}
@@ -260,6 +262,7 @@ button.icon{width:30px;padding:4px 0;font-weight:700;border-radius:50%}
   <span class="grp"><button id="fprev" title="Jump to the previous function">⇤ fn</button><button id="prev" title="Previous step (←)">←</button><button id="next" title="Next step (→)">→</button><button id="fnext" title="Jump to the next function">fn ⇥</button><button id="play" class="amber" title="Play or pause (Space)">▶ Play</button></span>
   <input type="range" id="slider" min="0" max="0" value="0" aria-label="step">
   <span class="pos" id="pos"></span>
+  <span id="pvB" class="pvb" hidden title="Drawn by the preview interpreter while you type. The real gcc + gdb trace replaces it when your code compiles">preview</span>
   <button id="bugB" class="bugpill" hidden title="jump to the next bug">bugs</button>
   <button id="helpB" class="icon" title="What every colour and mark means (?)" aria-label="What the marks mean">?</button>
   <span class="mw"><button id="menuB" aria-haspopup="true" aria-expanded="false">View ▾</button>
@@ -322,6 +325,7 @@ button.icon{width:30px;padding:4px 0;font-weight:700;border-radius:50%}
   <div class="hrow"><span class="sw line"></span><span>The line that just ran</span></div>
   <div class="hrow"><span class="sw line nx"></span><span>The line that runs next</span></div>
   <div class="hrow"><span class="sw txt" style="border-bottom:1px dotted #1D4ED8;border-radius:0;font-weight:500">head</span><span>Hover to follow it. Click a line to jump to where it runs (Shift: back)</span></div>
+  <div class="hrow"><span class="pvb" style="justify-self:start">preview</span><span>Drawn while you type, before the code compiles. The real gcc + gdb trace replaces it</span></div>
   <h3>Line in words</h3>
   <div class="hrow"><span class="sw" style="background:#F8FAFC;border:1px solid #D5DEE8;border-left:4px solid #7C8BA1"></span><span>What the line that just ran did, in plain words, with the real values. Turn it off in View</span></div>
   <h3>Bugs</h3>
@@ -337,6 +341,7 @@ button.icon{width:30px;padding:4px 0;font-weight:700;border-radius:50%}
   <pre id="code"></pre>
   <div><div id="watch" class="watch" hidden><div class="wh"><b>Watch</b><select id="wfn" aria-label="in which function"></select><input id="wex" type="text" placeholder="head->next" aria-label="expression to watch" spellcheck="false"><button id="wadd">Add</button><span class="wn" id="wnote"></span></div><div id="wlist"></div></div><div id="pic"></div><div class="ol">Program output</div><pre id="console"></pre><div class="hint"><span><kbd>←</kbd><kbd>→</kbd> step</span><span><kbd>Space</kbd> play</span><span><kbd>V</kbd> switch view</span><span>Click a variable to see its ladder</span><span>Hover an expression to follow it</span><span>Click a code line to jump to it</span><span><kbd>?</kbd> what the marks mean</span></div></div>
 </div>
+<script src="preview.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 const AMB="#B45309",AMBG="#FEF3C7",INK="#14213D",MUT="#5B6B82",LN="#D5DEE8",PNL="#F1F5F9",BAD="#B91C1C",DEAD="#94A3B8",BORDER="#A9B6C6",FAINT="#94A3B8";
@@ -795,7 +800,7 @@ function heapOrder(s,blocks){                                     /* lay the car
 const RCACHE=new Map();
 const reachAt=i=>{ if(!RCACHE.has(i)) RCACHE.set(i,reachable(TRACE.steps[i])); return RCACHE.get(i); };
 function leakHTML(s){
-  if(!TRACE||at!==TRACE.steps.length-1) return "";
+  if(!TRACE||at!==TRACE.steps.length-1||TRACE.stopped_at_cursor) return "";     /* a preview that stopped at your cursor hasn't ended */
   const R=reachAt(at), lost=[], kept=[];
   s.heap.forEach(n=>{ if(!n.freed) (R.has(n.addr)?kept:lost).push(n); });
   const other=(s.chunks||[]).filter(c=>c.state==="used"&&!ownChunk(c)&&!s.heap.some(n=>n.addr===c.addr));
@@ -1608,7 +1613,7 @@ function loadTrace(txt){
   });
   markAllocator(TRACE); markHeapSteps(TRACE); markInit(TRACE); frameColors(TRACE); EXNAMES=null; markBugs(TRACE); WATCH.forEach(w=>w.vals=null); EXNAMES=null; EXC=new Map(); RCACHE.clear(); at=0; buildMap(TRACE);
   try{ const v=+localStorage.getItem(posKey()); if(v>0&&v<TRACE.steps.length) at=v; }catch(e){}          /* back where you were */
-  $("drop").style.display="none"; $("main").style.display="grid";
+  $("drop").style.display="none"; $("main").style.display="grid"; $("pvB").hidden=!TRACE.preview;
   $("slider").max=TRACE.steps.length-1; draw();
 }
 function setSrc(t){ SRC=t.split("\n"); FNL=null; EXC=new Map(); if(TRACE){ markInit(TRACE); markBugs(TRACE); WATCH.forEach(w=>w.vals=null); draw(); } }
@@ -1758,7 +1763,11 @@ window.addEventListener("resize",()=>{ if(TRACE&&view==="mem") drawArrows(false)
 #edT{flex:1;resize:none;border:0;outline:0;padding:10px 12px;font:13px/1.55 var(--mono);color:var(--ink);background:#FBFCFE;tab-size:2;white-space:pre}
 #edS{height:auto;max-height:40%;padding:6px 12px;border:0;border-top:1px solid var(--line);font:12px var(--mono);color:var(--muted);background:#fff;overflow:auto;white-space:pre-wrap}
 #edS.err{color:#B91C1C;background:#FEF2F2}
-#edS.ok{color:#166534}`;
+#edS.ok{color:#166534}
+#edP{height:auto;max-height:30%;padding:5px 12px;border:0;border-top:1px solid var(--line);font:12px var(--mono);color:#4338CA;background:#F5F7FF;overflow:auto;white-space:pre-wrap}
+#edP:empty{display:none}
+#edP.err{color:#92400E;background:#FFFBEB}
+#edP.bug{color:#B91C1C;background:#FEF2F2}`;
   document.head.appendChild(css);
 
   const btn=document.createElement("button");
@@ -1767,12 +1776,39 @@ window.addEventListener("resize",()=>{ if(TRACE&&view==="mem") drawArrows(false)
 
   const ed=document.createElement("div");
   ed.id="ed"; ed.hidden=true;
-  ed.innerHTML=`<textarea id="edT" spellcheck="false" placeholder="type your C program here"></textarea><pre id="edS">Ctrl+Enter runs it right away</pre>`;
+  ed.innerHTML=`<textarea id="edT" spellcheck="false" placeholder="type your C program here"></textarea><pre id="edP"></pre><pre id="edS">Ctrl+Enter runs it right away</pre>`;
   document.body.appendChild(ed);
-  const T=$("edT"), S=$("edS");
+  const T=$("edT"), S=$("edS"), PV=$("edP");
 
   try{ T.value=localStorage.getItem("mv.code")||""; }catch(e){}          /* your code survives a reload */
-  btn.onclick=()=>{ ed.hidden=!ed.hidden; if(!ed.hidden) T.focus(); };
+  btn.onclick=()=>{ ed.hidden=!ed.hidden; if(!ed.hidden){ T.focus(); if(!TRACE||TRACE.preview) preview(); } };
+
+  /* the preview: preview.js runs the code up to the cursor at once, before gcc and gdb have finished */
+  let realFor=null, pwait=null;                                          /* realFor: the code the real trace on screen came from */
+  function preview(){
+    if(!window.CPreview) return;
+    const code=T.value;
+    if(!code.trim()){ PV.textContent=""; return; }
+    if(TRACE&&!TRACE.preview&&realFor===code) return;                    /* the real trace of this code is showing: it wins */
+    let r;
+    try{ r=CPreview.run(code,{caret:T.selectionStart}); }
+    catch(e){ PV.className="err"; PV.textContent="the preview failed: "+e.message; console.error(e); return; }
+    if(window.mvBlueprints){ if(r.blueprints.length) mvBlueprints.show(r.blueprints); mvBlueprints.highlight(r.highlight); }
+    if(r.trace){
+      SRC=code.split("\n"); FNL=null; EXC=new Map();                    /* the code panel, before the trace is marked */
+      loadTrace(JSON.stringify(r.trace));
+      at=TRACE.steps.length-1; draw();                                   /* where the cursor is */
+    }
+    PV.className=r.error?"err":r.bug?"bug":"";
+    PV.textContent=r.error?`preview stops at line ${r.error.line}: ${r.error.msg}`
+      :r.bug?`preview: ${r.bug}`
+      :r.trace?`preview: ${r.steps} step${r.steps===1?"":"s"}${r.partial?", up to the cursor":""}${r.note?" · "+r.note:""}`
+      :r.note;
+  }
+  const later=ms=>{ clearTimeout(pwait); pwait=setTimeout(preview,ms); };
+  ["keyup","mouseup"].forEach(ev=>T.addEventListener(ev,e=>{                /* the cursor moved: show memory at the new spot */
+    if(ev==="keyup"&&!/^(Arrow|Home|End|Page)/.test(e.key)) return;
+    if(!TRACE||TRACE.preview) later(60); }));
 
   let wait=null, runs=0;
   async function run(){
@@ -1784,13 +1820,15 @@ window.addEventListener("resize",()=>{ if(TRACE&&view==="mem") drawArrows(false)
     catch(e){ if(me===runs){ S.className="err"; S.textContent="can't reach the server: is python3 server.py running?"; } return; }
     if(me!==runs) return;                                                /* you typed again: a newer run is coming */
     if(!r.ok){ S.className="err"; S.textContent=text; return; }          /* gcc's error */
-    loadTrace(text); setSrc(code);
+    clearTimeout(pwait);
+    loadTrace(text); setSrc(code); realFor=code;                         /* the real trace always replaces the preview */
     at=TRACE.steps.length-1; draw();                                     /* show the end; step back with ← */
     S.className="ok"; S.textContent=`✓ ${TRACE.steps.length} steps`;
   }
 
   T.addEventListener("input",()=>{
     try{ localStorage.setItem("mv.code",T.value); }catch(e){}
+    later(120);                                                          /* the preview, almost at once */
     clearTimeout(wait); wait=setTimeout(run,1000);                      /* run 1 second after you stop typing */
   });
   T.addEventListener("keydown",e=>{
@@ -1814,16 +1852,19 @@ window.addEventListener("resize",()=>{ if(TRACE&&view==="mem") drawArrows(false)
 .bpf{min-width:64px;display:flex;flex-direction:column;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:#EEF2F7;font:12px/1.4 var(--mono);color:var(--ink)}
 .bpf span{color:var(--muted)}
 .bpf i{font-style:normal;font-size:11px;color:var(--faint)}
-.bpf.pad{background:repeating-linear-gradient(135deg,#fff 0 3px,#E6EAEE 3px 4.5px);color:var(--muted)}`;
+.bpf.pad{background:repeating-linear-gradient(135deg,#fff 0 3px,#E6EAEE 3px 4.5px);color:var(--muted)}
+.bpc.hl .bpr{border-style:solid;border-color:#2563EB;box-shadow:0 0 0 3px #DBEAFE}
+.bpc.hl .bpt{color:#1D4ED8}`;
   document.head.appendChild(css);
 
   const B=document.createElement("div");
   B.id="bp"; $("pic").before(B);                                         /* sits just above the stack picture */
   const T=$("edT"), esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
+  let HL=null;                                                            /* the struct you're typing right now */
   function show(list){
     B.innerHTML=!list.length?"":`<div class="bph">Blueprints<small>what each struct looks like: no memory is used until you create one</small></div>`+
-      list.map(s=>`<div class="bpc"><div class="bpt">${esc(s.name)} <small>${s.size} bytes</small></div>`+
+      list.map(s=>`<div class="bpc${s.name===HL?" hl":""}" data-bp="${esc(s.name)}"><div class="bpt">${esc(s.name)} <small>${s.size} bytes</small></div>`+
         `<div class="bpr" style="width:${Math.max(160,s.size*34)}px">`+                                   /* wider struct, wider card */
         s.fields.map(f=>f.name===null
           ?`<div class="bpf pad" style="flex:${f.size} 1 0"><b>padding</b><span>${f.size} B</span><i>offset ${f.offset}</i></div>`
@@ -1837,9 +1878,11 @@ window.addEventListener("resize",()=>{ if(TRACE&&view==="mem") drawArrows(false)
     const code=T.value, me=++runs;
     let r, text;
     try{ r=await fetch("/blueprints",{method:"POST",body:code}); text=await r.text(); }catch(e){ return; }
-    if(me!==runs||!r.ok) return;                                         /* half-typed code: keep the last good cards */
+    if(me!==runs||!r.ok||T.value!==code) return;                         /* half-typed code: keep the last good cards */
     show(JSON.parse(text));
   }
+  function highlight(name){ HL=name||null; B.querySelectorAll(".bpc").forEach(c=>c.classList.toggle("hl",c.dataset.bp===HL)); }
+  window.mvBlueprints={show,highlight};                                  /* the preview sends cards and highlights here */
   T.addEventListener("input",()=>{ clearTimeout(wait); wait=setTimeout(load,1000); });
   if(T.value.trim()) load();                                             /* code saved from last time */
 })();
