@@ -303,7 +303,7 @@ def snapshot():
     starts = {c["addr"] for c in chunks if c["state"] == "used"}       # where real malloc'd blocks start
     locals_ = {v["addr"] for fr in frames for v in fr["vars"]            # structs living on the stack
                if v["kind"] == "other" and v["type"].startswith("struct ") and "[" not in v["type"]}
-    real = (lambda a: a in starts or a in locals_) if chunks else (lambda a: True)
+    real = (lambda a: a in starts or a in locals_) if chunks else (lambda a: a in ALLOCED or a in locals_)   # no heap yet: a leftover pointer is not a block
     for fr in frames: discover(fr["vars"], real)
     ret = None
     if steps and len(frames) < len(steps[-1]["frames"]):           # a function just returned

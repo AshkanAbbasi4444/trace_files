@@ -20,7 +20,7 @@ const P = require("./preview.js");
 const DIR = __dirname;
 
 const files = process.argv.slice(2).length ? process.argv.slice(2).map(f => path.resolve(f))
-  : [...fs.readdirSync(DIR).filter(f => f.endsWith(".c")).map(f => path.join(DIR, f)),
+  : [...fs.readdirSync(DIR).filter(f => f.endsWith(".c") && f !== "prog.c" && f !== "bp.c").map(f => path.join(DIR, f)),   /* those two are server.py's scratch files */
      ...(fs.existsSync(path.join(DIR, "tests")) ? fs.readdirSync(path.join(DIR, "tests")).filter(f => f.endsWith(".c")).map(f => path.join(DIR, "tests", f)) : [])];
 
 function realTrace(code) {

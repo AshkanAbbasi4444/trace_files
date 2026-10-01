@@ -1811,6 +1811,7 @@ window.addEventListener("resize",()=>{ if(TRACE&&view==="mem") drawArrows(false)
     if(!TRACE||TRACE.preview) later(60); }));
 
   let wait=null, runs=0;
+  window.mvEditor={cancel(){ clearTimeout(wait); clearTimeout(pwait); runs++; }};   /* another trace is opening: drop the pending runs */
   async function run(){
     const code=T.value, me=++runs;
     if(!code.trim()) return;
@@ -1885,6 +1886,164 @@ window.addEventListener("resize",()=>{ if(TRACE&&view==="mem") drawArrows(false)
   window.mvBlueprints={show,highlight};                                  /* the preview sends cards and highlights here */
   T.addEventListener("input",()=>{ clearTimeout(wait); wait=setTimeout(load,1000); });
   if(T.value.trim()) load();                                             /* code saved from last time */
+})();
+/* ---------- the edge-case tester: run a list function on empty, one-node, duplicate and long lists ---------- */
+(function(){
+  const css=document.createElement("style");
+  css.textContent=`
+#tc{position:fixed;right:0;top:var(--barh,52px);bottom:0;width:400px;z-index:2;display:flex;flex-direction:column;background:#fff;border-left:1px solid var(--line);box-shadow:-4px 0 12px rgba(20,33,61,.08)}
+#tc[hidden]{display:none}
+body.tc-open #main{padding-right:400px}
+.tch{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line)}
+.tch b{font-size:14px}
+.tch small{color:var(--muted);font-size:11.5px;flex:1}
+.tcbody{flex:1;overflow:auto;padding:10px 12px}
+.tcf{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.tcf select{font:12px var(--mono);max-width:100%}
+.tca{display:flex;flex-wrap:wrap;gap:6px 12px;margin:8px 0 0;font:12px var(--mono);color:var(--ink)}
+.tca input{width:60px;font:12px var(--mono);border:1px solid var(--line);border-radius:6px;padding:2px 6px}
+.tca small{font-family:var(--sans);color:var(--muted);width:100%}
+.tcn{margin:8px 0;font-size:12.5px;color:var(--muted);white-space:pre-wrap}
+.tcn:empty{display:none}
+.tcn.err{color:#B91C1C;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:6px 8px;font:12px var(--mono)}
+.tcr{border:1px solid var(--line);border-radius:9px;padding:7px 9px;margin:7px 0;cursor:pointer;background:#fff}
+.tcr:hover{border-color:#93C5FD}
+.tcr.fail{border-color:#FCA5A5;background:#FFFAFA}
+.tcr.on{box-shadow:0 0 0 2px #2563EB}
+.tc1{display:flex;align-items:center;gap:8px}
+.tc1 code{font:600 12.5px var(--mono);color:var(--ink)}
+.tc1 .nm{flex:1;font-size:11.5px;color:var(--muted)}
+.tci{width:16px;text-align:center;font-weight:800;color:var(--faint)}
+.pass .tci{color:#15803D}
+.fail .tci{color:#B91C1C}
+.tcdel{border:0;background:none;color:var(--muted);padding:0 4px;font-size:15px}
+.tce{width:100%;box-sizing:border-box;margin-top:5px;font:12px var(--mono);border:1px solid var(--line);border-radius:6px;padding:3px 7px;color:var(--ink)}
+.tcv{font:12px var(--mono);color:var(--ink);margin-top:4px}
+.tcv span{display:inline-block;width:46px;color:var(--muted);font-family:var(--sans)}
+.tcv i{font-style:normal;color:var(--muted);margin-left:8px}
+.tcw{margin-top:4px;font-size:12.5px;color:#B91C1C}
+.tco{margin-top:4px;font:11.5px var(--mono);color:var(--muted);white-space:pre-wrap}
+.tcgo{margin-top:4px;font-size:11.5px;color:#1D4ED8}
+.tcadd{display:flex;gap:6px;margin:10px 0 4px}
+.tcadd input{flex:1;font:12px var(--mono);border:1px solid var(--line);border-radius:6px;padding:3px 7px}
+.tcfoot{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid var(--line)}
+.tcfoot button{white-space:nowrap}
+#tcS{font-size:12.5px;color:var(--muted)}
+#tcS.bad{color:#B91C1C}
+#tcS.good{color:#15803D}`;
+  document.head.appendChild(css);
+
+  const btn=document.createElement("button");
+  btn.id="tcB"; btn.textContent="Test cases"; btn.title="Run a linked list function from the Write code box on edge cases";
+  $("editB").after(btn);
+  const box=document.createElement("div");
+  box.id="tc"; box.hidden=true;
+  box.innerHTML=`<div class="tch"><b>Edge-case tester</b><small>gcc -fsanitize=address, 2 s per case</small><button id="tcX" class="icon" title="Close" aria-label="Close">×</button></div>`+
+    `<div class="tcbody"><label class="tcf">Function to test<select id="tcF"></select></label><div id="tcA" class="tca"></div><div id="tcN" class="tcn"></div><div id="tcL"></div>`+
+    `<div class="tcadd"><input id="tcNew" type="text" placeholder="your own case, like 3, 3, 1 or []" spellcheck="false"><button id="tcAdd">Add case</button></div></div>`+
+    `<div class="tcfoot"><button id="tcRun" class="amber">Run all cases</button><span id="tcS"></span></div>`;
+  document.body.appendChild(box);
+  const T=$("edT"), sel=$("tcF");
+
+  const BUILT=[["empty list",[]],["one node",[1]],["all the same",[1,1,1]],["all different",[1,2,3]],["pair at the start",[1,1,2]],["pair at the end",[1,2,2]],
+    ["pair in the middle",[2,1,1,2]],["pair at the end",[6,11,11]],["long list, 20 nodes",Array.from({length:20},(_,i)=>i+1)]];
+  let S={custom:[],expect:{},args:{},last:""};                           /* your cases, expected lists and arguments survive a reload */
+  try{ Object.assign(S,JSON.parse(localStorage.getItem("mv.cases")||"{}")); }catch(e){}
+  const save=()=>{ try{ localStorage.setItem("mv.cases",JSON.stringify(S)); }catch(e){} };
+  let FUNCS=[], RES={}, OPEN=null;                                       /* RES: "[1,1,2]" -> its result, for the function shown */
+  const key=v=>JSON.stringify(v);
+  const parse=t=>{ t=(t||"").trim(); if(!t) return null; if(/^(\[\s*\]|empty|null)$/i.test(t)) return []; const m=t.match(/-?\d+/g); return m?m.map(Number):null; };
+  const listTxt=v=>!v?"—":v.length?v.join(" → ")+" → NULL":"NULL (empty)";
+  const cases=()=>[...BUILT.map(([name,vals])=>({name,vals})),...S.custom.map((vals,i)=>({name:"yours",vals,custom:i}))];
+  const fn=()=>FUNCS.find(f=>f.name===sel.value);
+  const args=()=>{ const f=fn(), a=S.args[sel.value]||{}, out={}; if(f) f.params.filter(p=>!p.list).forEach(p=>out[p.name]=parseInt(a[p.name]??1,10)||0); return out; };
+  const note=(t,err)=>{ $("tcN").textContent=t||""; $("tcN").className="tcn"+(err?" err":""); };
+  const status=(t,cls)=>{ $("tcS").textContent=t; $("tcS").className=cls||""; };
+  async function post(body){ const r=await fetch("/cases",{method:"POST",body:JSON.stringify(body)}); return r.json(); }
+
+  async function loadFuncs(){
+    let r;
+    try{ r=await post({code:T.value,list:true}); }catch(e){ note("Can't reach the server: is python3 server.py running?",true); return; }
+    FUNCS=r.functions||[];
+    const was=sel.value||S.last;
+    sel.innerHTML=FUNCS.map(f=>`<option value="${esc(f.name)}">${esc(f.sig)}</option>`).join("");
+    if(FUNCS.some(f=>f.name===was)) sel.value=was;
+    note(FUNCS.length?"":"No function in the Write code box takes a struct ListNode * yet. Write one, like:\nstruct ListNode *remove_duplicates(struct ListNode *head)");
+    renderArgs(); render();
+  }
+  function renderArgs(){
+    const f=fn(), a=S.args[sel.value]||{}, ps=f?f.params.filter(p=>!p.list):[];
+    $("tcA").innerHTML=ps.map(p=>`<label>${esc(p.type)} ${esc(p.name)} = <input data-arg="${esc(p.name)}" value="${esc(a[p.name]??1)}" spellcheck="false"></label>`).join("")+
+      (ps.length?"<small>the same for every case</small>":"");
+  }
+  function render(){
+    const E=S.expect[sel.value]||{};
+    $("tcL").innerHTML=!FUNCS.length?"":cases().map(c=>{
+      const k=key(c.vals), r=RES[k];
+      return `<div class="tcr${r?(r.pass?" pass":" fail"):""}${OPEN===k?" on":""}" data-k="${esc(k)}" title="Click to step through this case in the viewer">`+
+        `<div class="tc1"><span class="tci">${r?(r.pass?"✓":"✗"):"·"}</span><code>${esc(k.replace(/,/g,", "))}</code><span class="nm">${esc(c.name)}</span>`+
+        (c.custom!==undefined?`<button class="tcdel" data-del="${c.custom}" title="Remove this case">×</button>`:"")+`</div>`+
+        `<input class="tce" data-exp="${esc(k)}" value="${esc(E[k]||"")}" placeholder="expected result (optional), like 1, 2 or []" spellcheck="false">`+
+        (r?`<div class="tcv"><span>before</span>${esc(listTxt(r.before))}</div>`+
+           `<div class="tcv"><span>after</span>${esc(r.cycle?"a cycle: it never reaches NULL":listTxt(r.after))}${r.returned!==null?`<i>returned ${r.returned}</i>`:""}</div>`+
+           r.reasons.map(x=>`<div class="tcw">${esc(x.text)}</div>`).join("")+
+           (r.output.trim()?`<div class="tco">it printed: ${esc(r.output.trim().slice(0,300))}</div>`:"")+
+           (r.pass?"":`<div class="tcgo">Click to step through it ▸</div>`):"")+`</div>`;
+    }).join("");
+  }
+  async function runAll(){
+    const f=fn(); if(!f) return;
+    const E=S.expect[f.name]||{}, list=cases().map(c=>({name:c.name,vals:c.vals,expect:parse(E[key(c.vals)])}));
+    status(`running ${list.length} cases…`); $("tcRun").disabled=true; note("");
+    let r;
+    try{ r=await post({code:T.value,func:f.name,args:args(),cases:list}); }
+    catch(e){ status("Can't reach the server: is python3 server.py running?","bad"); return; }
+    finally{ $("tcRun").disabled=false; }
+    RES={};
+    if(r.error){ status("gcc can't compile it","bad"); note(r.error,true); render(); return; }
+    r.results.forEach(x=>RES[key(x.vals)]=x);
+    const bad=r.results.filter(x=>!x.pass).length;
+    status(bad?`${bad} of ${r.results.length} failed: click one to step through it`:`all ${r.results.length} passed`,bad?"bad":"good");
+    render();
+  }
+  /* the same test without -fsanitize, through the normal /run pipeline (gcc + gdb trace.py), into the viewer */
+  async function trace(k){
+    const f=fn(); if(!f) return;
+    OPEN=k; render(); status(`tracing ${k} with gdb…`);
+    let p, q, text;
+    try{
+      p=await post({code:T.value,func:f.name,args:args(),trace:JSON.parse(k)});
+      if(p.error){ status(""); note(p.error,true); return; }
+      q=await fetch("/run",{method:"POST",body:p.program}); text=await q.text();
+    }catch(e){ status("Can't reach the server: is python3 server.py running?","bad"); return; }
+    if(!q.ok){ status("gcc can't compile it","bad"); note(text,true); return; }
+    if(window.mvEditor) mvEditor.cancel();                                /* your code in Write code stays as it is */
+    loadTrace(text); setSrc(p.shown);
+    const i=TRACE.steps.findIndex(s=>s.func===f.name), ok=i>=0&&TRACE.steps[i+1]&&TRACE.steps[i+1].func===f.name;
+    at=i<0?0:ok?i+1:i; draw(); setBarH();                                  /* start inside your function: its first line has run */
+    status(`${k}: ${TRACE.steps.length} steps. The tester's main is at the bottom of the code`);
+  }
+
+  btn.onclick=()=>{ box.hidden=!box.hidden; document.body.classList.toggle("tc-open",!box.hidden); setBarH(); if(!box.hidden) loadFuncs(); };
+  $("tcX").onclick=()=>{ box.hidden=true; document.body.classList.remove("tc-open"); };
+  sel.onchange=()=>{ S.last=sel.value; save(); RES={}; OPEN=null; status(""); renderArgs(); render(); };
+  $("tcA").addEventListener("input",e=>{ const n=e.target.dataset.arg; if(n===undefined) return; (S.args[sel.value]=S.args[sel.value]||{})[n]=e.target.value; save(); });
+  $("tcL").addEventListener("input",e=>{ const k=e.target.dataset.exp; if(k===undefined) return; (S.expect[sel.value]=S.expect[sel.value]||{})[k]=e.target.value; save(); });
+  $("tcL").addEventListener("click",e=>{
+    if(e.target.closest("input")) return;
+    const d=e.target.closest("[data-del]"); if(d){ S.custom.splice(+d.dataset.del,1); save(); render(); return; }
+    const row=e.target.closest(".tcr"); if(row) trace(row.dataset.k);
+  });
+  const add=()=>{ const v=parse($("tcNew").value);
+    if(v===null){ note("Type the list's values, like 3, 3, 1, or [] for an empty list.",true); return; }
+    if(!cases().some(c=>key(c.vals)===key(v))){ S.custom.push(v); save(); }
+    $("tcNew").value=""; note(""); render(); };
+  $("tcAdd").onclick=add;
+  $("tcNew").addEventListener("keydown",e=>{ if(e.key==="Enter") add(); });
+  $("tcRun").onclick=runAll;
+  box.addEventListener("keydown",e=>e.stopPropagation());                   /* typing here doesn't step the trace */
+  let wait=null;
+  T.addEventListener("input",()=>{ if(box.hidden) return; clearTimeout(wait); wait=setTimeout(loadFuncs,800); });   /* new functions show up */
 })();
 </script>
 </body>

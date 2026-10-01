@@ -1,0 +1,9 @@
+# written by server.py on every run
+prog
+prog.c
+prog.json
+prog_stdout.txt
+bp.c
+bp.o
+bp.json
+__pycache__/

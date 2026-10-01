@@ -1,4 +1,5 @@
 import http.server, os, subprocess
+import cases
 
 PORT = 8000
 DIR = os.path.dirname(os.path.abspath(__file__))   # the folder server.py is in
@@ -56,7 +57,7 @@ def blueprints(code):
         return False, "gdb did not write bp.json"
 
 
-ROUTES = {"/run": build_and_trace, "/blueprints": blueprints}
+ROUTES = {"/run": build_and_trace, "/blueprints": blueprints, "/cases": cases.handle}   # /cases: the edge-case tester, see cases.py
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
